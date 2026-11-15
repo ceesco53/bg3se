@@ -82,9 +82,12 @@ fi
   echo "game: $1"
 } >> "$log"
 
-if [ "$(uname -m)" != "arm64" ]; then
+# Ask the hardware, not `uname -m`: Steam starts launch wrappers under Rosetta, where uname
+# reports x86_64 even on Apple Silicon.
+echo "uname: $(uname -m)  apple silicon: $(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)  translated: $(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" >> "$log"
+if [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" != "1" ]; then
   echo "bg3se: Intel Macs are not supported yet (the hook engine is arm64-only); starting the game without the extender" >&2
-  echo "not arm64: starting without the extender" >> "$log"
+  echo "not Apple Silicon: starting without the extender" >> "$log"
   [ $dry_run -eq 1 ] && { echo "$@"; exit 0; }
   exec "$@"
 fi

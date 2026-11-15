@@ -71,6 +71,11 @@ for the rest. The console is served on a Unix socket in
 be started from a terminal (`./bg3se-launch.sh --engine 2 --console`, with Steam running); the
 console is then available directly in that terminal as well.
 
+Steam passes the app bundle to the launcher and runs it under Rosetta; the launcher starts the
+game's arm64 build regardless. (If the game shows a "Rosetta - Intel / ARM64" chooser that keeps
+coming back, it was started as the Intel build: check that the launch options start with the
+launcher's path.)
+
 If the game does not start from Steam, `~/Library/Application Support/BG3ScriptExtender/launcher.log`
 records what the launcher was given and why it stopped.
 
