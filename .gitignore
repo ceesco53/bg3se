@@ -351,3 +351,4 @@ BG3Extender/GameDefinitions/Generated
 # macOS build output
 /build/
 .DS_Store
+macOS/Local.env

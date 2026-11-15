@@ -124,8 +124,12 @@ Things established from the macOS game binary so far:
 
 `macOS/scripts/release.sh` builds a Release dylib, runs the tests, signs it with a Developer ID
 Application certificate, notarizes the archive with `notarytool`, and creates a GitHub release.
-Pass `--no-publish` to stop after notarization. The notarization profile defaults to
-`argus-notary`; set `BG3SE_NOTARY_PROFILE` to use another. Raise `macOS/VERSION` for each release.
+Pass `--no-publish` to stop after notarization. Raise `macOS/VERSION` for each release.
+
+One-time setup: a Developer ID Application certificate in your Keychain, and notarization
+credentials stored with `xcrun notarytool store-credentials bg3se-notary --apple-id … --team-id …`.
+To use a profile with another name, set `BG3SE_NOTARY_PROFILE` in the environment or in
+`macOS/Local.env` (git-ignored).
 
 ## License
 

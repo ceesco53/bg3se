@@ -4,7 +4,8 @@
 # One-time setup:
 #   - a Developer ID Application certificate in your Keychain
 #   - notarization credentials:  xcrun notarytool store-credentials <profile> --apple-id ... --team-id ...
-#     (the profile name defaults to argus-notary; override with BG3SE_NOTARY_PROFILE)
+#     (the profile name defaults to bg3se-notary; set BG3SE_NOTARY_PROFILE to use another,
+#     either in the environment or in the git-ignored file macOS/Local.env)
 # For each release, raise the version in macOS/VERSION first.
 #
 #   macOS/scripts/release.sh               build, sign, notarize, publish a GitHub release
@@ -15,7 +16,9 @@ cd "$(dirname "$0")/../.."
 publish=1
 [ "${1:-}" = "--no-publish" ] && publish=0
 
-notary_profile=${BG3SE_NOTARY_PROFILE:-argus-notary}
+# Machine-specific settings stay out of the repository
+[ -f macOS/Local.env ] && . macOS/Local.env
+notary_profile=${BG3SE_NOTARY_PROFILE:-bg3se-notary}
 version=$(tr -d '[:space:]' < macOS/VERSION)
 tag="macos-v$version"
 out=build/release
