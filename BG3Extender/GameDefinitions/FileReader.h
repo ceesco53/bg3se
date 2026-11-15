@@ -37,6 +37,13 @@ struct FileReader : public Noncopyable<FileReader>
     void* FileObject{ nullptr };
 };
 
+#if defined(__APPLE__)
+// ls::FileReader::FileReader() on macOS initializes fields up to +0x88 (IsLoaded, DataPtr, ReadPtr
+// and FileSize are at the Windows offsets); the object the extender allocates must be at least that big.
+static_assert(sizeof(FileReader) >= 0x90);
+static_assert(offsetof(FileReader, FileSize) == 0x18);
+#endif
+
 class FileReaderPin
 {
 public:

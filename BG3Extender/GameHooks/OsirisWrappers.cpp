@@ -57,6 +57,22 @@ void OsirisWrappers::Initialize()
     // containers whose layouts differ from the Windows definitions in GameDefinitions/Osiris.h.
     // Until those are verified, Osiris is left unhooked rather than read through wrong layouts.
     WARN("Osiris integration is not available on macOS yet; Osi.* calls and Osiris event listeners are disabled.");
+
+    // Shared code tests `*Globals.X == nullptr` to tell whether a story is loaded. Point every
+    // global at an empty slot so that it sees "no story" instead of dereferencing a null pointer.
+    static void* emptySlot{ nullptr };
+    static DebugFlag debugFlags{};
+    Globals.StringTable = reinterpret_cast<COsiStringTable***>(&emptySlot);
+    Globals.Variables = reinterpret_cast<VariableDb**>(&emptySlot);
+    Globals.Types = reinterpret_cast<OsiTypeDb**>(&emptySlot);
+    Globals.Enums = reinterpret_cast<EnumDb**>(&emptySlot);
+    Globals.Functions = reinterpret_cast<FunctionDb**>(&emptySlot);
+    Globals.Objects = reinterpret_cast<ObjectDb**>(&emptySlot);
+    Globals.Goals = reinterpret_cast<GoalDb**>(&emptySlot);
+    Globals.Adapters = reinterpret_cast<AdapterDb**>(&emptySlot);
+    Globals.Databases = reinterpret_cast<DatabaseDb**>(&emptySlot);
+    Globals.Nodes = reinterpret_cast<NodeDb**>(&emptySlot);
+    Globals.DebugFlags = &debugFlags;
     return;
 #endif
 

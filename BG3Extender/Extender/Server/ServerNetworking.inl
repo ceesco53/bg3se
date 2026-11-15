@@ -106,6 +106,12 @@ void NetworkManager::OnClientConnectMessage(net::MessageContext* context, net::C
 
 void NetworkManager::ExtendNetworking()
 {
+#if defined(__APPLE__)
+    // FIXME(macOS): the net message factory layout is unverified (crashes reading MessagePools),
+    // so the extender's own network channel (Ext.Net, client/server sync) is not set up.
+    return;
+#endif
+
     auto server = GetServer();
     if (server == nullptr) return;
 

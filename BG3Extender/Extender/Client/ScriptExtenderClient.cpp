@@ -150,6 +150,8 @@ void ScriptExtender::OnGameStateChanged(GameState fromState, GameState toState)
 {
 #if defined(__APPLE__)
     INFO("Client game state: %d -> %d", (int)fromState, (int)toState);
+    // Stage 1 only observes state changes; everything below acts on game structures
+    if (darwin::EngineStage() < 2) return;
 #endif
     if (config_.SendCrashReports) {
         // We need to initialize the crash reporter after the game engine has started,
@@ -197,8 +199,15 @@ void ScriptExtender::OnGameStateChanged(GameState fromState, GameState toState)
     switch (fromState) {
     case GameState::LoadModule:
         INFO("ecl::ScriptExtender::OnGameStateChanged(): Loaded module");
+#if !defined(__APPLE__)
+        // FIXME(macOS): the virtual texture manager layout is unverified (crashes in BindSEVirtualTextures)
         gExtender->GetVirtualTextureHelpers().Load();
+#endif
+#if !defined(__APPLE__)
+        // FIXME(macOS): writes the version banner into the game's translated string repository,
+        // whose lock layout is unverified on macOS (SRWSpinLock assertion)
         ShowVersionNumber();
+#endif
         LoadExtensionState(ExtensionStateContext::Game);
         break;
 

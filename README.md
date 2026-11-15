@@ -5,7 +5,7 @@
 The Script Extender adds Lua/Osiris scripting support to the game.
 
 > **macOS port (work in progress):** this fork adds a native build for the macOS version of the game.
-> It is not usable for mods yet. See [macOS/README.md](macOS/README.md) for its status, installation and build steps.
+> The Lua console works in game; most of the game-data API is not verified yet. See [macOS/README.md](macOS/README.md) for its status, installation and build steps.
 [API Documentation](https://github.com/Norbyte/bg3se/blob/master/Docs/API.md)
 
 ### Configuration

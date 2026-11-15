@@ -51,6 +51,7 @@ void SetupScriptExtender()
 
     if (config.CreateConsole) {
         gCoreLibPlatformInterface.GlobalConsole->Create();
+        darwin::StartConsoleSocket();
     }
 
     // A game started from Steam or Finder has no visible stdout, so the console is always

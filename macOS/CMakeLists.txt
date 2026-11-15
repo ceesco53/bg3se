@@ -235,6 +235,7 @@ set(SE_SOURCES
 
 set(SE_PLATFORM_SOURCES
     Platform/Entry.cpp
+    Platform/ConsoleSocket.cpp
     Platform/CrashReporter.cpp
     Platform/Hooking.cpp
     Platform/MachO.cpp

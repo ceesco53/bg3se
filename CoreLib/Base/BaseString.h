@@ -67,6 +67,12 @@ namespace bg3se
 
     using STDString = std::basic_string<char, std::char_traits<char>, GameAllocator<char>>;
     using STDWString = std::basic_string<wchar_t, std::char_traits<wchar_t>, GameAllocator<wchar_t>>;
+#if defined(__APPLE__) && defined(__aarch64__)
+    // ls::STDString in the macOS game is libc++'s basic_string with a 32-bit size_type allocator:
+    // { char* data; uint32 size; uint32 capacity | long flag }, 14 characters inline. GameAllocator's
+    // size_type makes STDString come out identical (verified against live strings in the game).
+    static_assert(sizeof(STDString) == 16);
+#endif
     using StringView = std::string_view;
     using LSStringView = LSBaseStringView<char>;
     using WStringView = std::wstring_view;

@@ -40,7 +40,17 @@ void StaticTypeInformation::DeferredInitialize()
 {
     if (Type == nullptr && Initializer != nullptr) {
         Type = Initializer();
+#if defined(__APPLE__)
+        // Report which initializer failed instead of stopping the game; the offset can be
+        // symbolized with `atos -o libBG3ScriptExtender.dylib -l 0 <offset>`.
+        if (Type == nullptr) {
+            ERR("Type initializer at extender offset 0x%llx produced no type",
+                (unsigned long long)((uintptr_t)Initializer - (uintptr_t)gCoreLibPlatformInterface.ThisModule));
+            Initializer = nullptr;
+        }
+#else
         se_assert(Type != nullptr);
+#endif
     }
 
     if (Type) {
@@ -213,6 +223,12 @@ void TypeInformationRepository::Initialize()
     RegisterStaticType<uint32_t>("uint32", LuaTypeId::Integer);
     RegisterStaticType<int64_t>("int64", LuaTypeId::Integer);
     RegisterStaticType<uint64_t>("uint64", LuaTypeId::Integer);
+#if defined(__APPLE__)
+    // On LP64, (unsigned) long is a distinct type from (u)int64_t (long long); size_t, uintptr_t
+    // and friends are spelled with it. They are the same thing to Lua.
+    GetStaticTypeInfo(Overload<long>{}).Type = GetStaticTypeInfo(Overload<int64_t>{}).Type;
+    GetStaticTypeInfo(Overload<unsigned long>{}).Type = GetStaticTypeInfo(Overload<uint64_t>{}).Type;
+#endif
     RegisterStaticType<float>("float", LuaTypeId::Float);
     RegisterStaticType<double>("double", LuaTypeId::Float);
     RegisterStaticType<FixedString>("FixedString", LuaTypeId::String);

@@ -57,6 +57,9 @@ std::optional<std::string> GetEmbeddedResource(char const* name);
 //   3  + all engine hooks (file reader, ECS update, stats, ...)
 int EngineStage();
 
+// Serves the extender console on a Unix domain socket (see ConsoleSocket.cpp)
+void StartConsoleSocket();
+
 // Blocking native alert; safe to call from any thread
 void ShowAlert(char const* title, char const* message);
 

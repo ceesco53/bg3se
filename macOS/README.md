@@ -4,30 +4,39 @@ This is a native macOS port of [Norbyte's BG3 Script Extender](https://github.co
 It builds the extender's own source code as an arm64 dylib that loads into the macOS game
 (the Steam version), instead of the Windows DLL.
 
-**Status: early, not usable for mods yet.** The extender compiles, links, loads and resolves
-engine symbols in the macOS game binary, but the engine integration that mods depend on is not
-verified and is switched off by default. See [What works](#what-works) before installing.
+**Status: early.** The Lua console works in the macOS game (client and server side, at the main
+menu and in a loaded save), but only when the experimental engine integration is switched on, and
+large parts of the API that touch game data are not verified. Mods that depend on the extender
+should not be expected to work yet. See [What works](#what-works) before installing.
 
 ## What works
+
+Checked in game against version 4.1.1.7631656 (Apple Silicon, Steam).
 
 | Area | State |
 |--|--|
 | Build | All of the extender (CoreLib, Lua, Osiris, IMGUI and game definition code) compiles and links with Apple clang for arm64 |
-| Loading | Injected with `DYLD_INSERT_LIBRARIES`; initializes at the game's `main()`. Verified in game |
-| Function hooking | arm64 inline hook engine with instruction relocation; covered by tests |
-| Engine symbols | Resolved by name from the game's symbol table; 37 of the extender's 99 engine symbols are mapped so far. Verified in game |
-| Console / log | Console output is written to `~/Library/Application Support/BG3ScriptExtender/bg3se.log` |
-| Lua, `Ext.*`, mods | **Not working yet.** Needs the engine hooks below |
-| Engine hooks (game state, ECS, stats) | Experimental; off by default, enabled in stages with `BG3SE_ENGINE` |
+| Loading | Injected with `DYLD_INSERT_LIBRARIES`; initializes at the game's `main()`. Works |
+| Function hooking | arm64 inline hook engine with instruction relocation; covered by tests and used on live engine functions |
+| Engine symbols | Resolved by name from the game's symbol table; 39 of the extender's 99 engine symbols are mapped |
+| Game state tracking | Works (stage 1): client and server state changes are observed |
+| Lua console | Works (stage 2): client and server Lua states are created, and commands run through the console socket at the main menu and in a loaded save |
+| `Ext.Utils`, `Ext.Json`, `Ext.Math`, `Ext.Enums`, `Ext.Types` | Work as far as tested from the console |
+| Entities and components (`Ext.Entity`) | **Not working**: component and system indices are not mapped on macOS yet (the log lists each one) |
+| Stats, templates, resources, levels | Unverified: the symbols are mapped, the structure layouts behind them are not checked |
+| Mod loading (`ScriptExtender/Config.json`, bootstrap scripts) | Unverified |
+| Engine hooks (file reader, ECS update, stats; stage 3) | Untested in game |
 | Osiris (`Osi.*`, story events) | Not ported: the library's internal layouts differ on macOS |
+| Client/server messaging (`Ext.Net`) | Disabled: the net message factory layout is unverified |
 | IMGUI overlay | Not ported: needs a Metal backend (the Windows build hooks DX11 / Vulkan) |
 | Input hooks | Not ported: the macOS game does not use SDL |
+| Version banner, virtual texture merging | Disabled: they write to game structures whose layout is unverified |
 | Crash reporter, auto-updater | Not ported |
 | Intel Macs | Not supported: the hook engine is arm64-only |
 
 By default the extender runs in **diagnostic mode**: it resolves engine symbols, writes what it
-found to the log, and installs no hooks, so it cannot affect the game. Checked against game
-version 4.1.1.7631656.
+found to the log, and installs no hooks, so it cannot affect the game. Everything beyond that is
+opt-in through `BG3SE_ENGINE` (below).
 
 ## Install
 
@@ -41,11 +50,26 @@ version 4.1.1.7631656.
 
 3. Start the game from Steam, then read `~/Library/Application Support/BG3ScriptExtender/bg3se.log`.
 
-To start it from a terminal instead (with Steam running), and see the console there:
+To get the Lua console, enable the engine integration and the console in the launch options:
+
+```
+BG3SE_ENGINE=2 BG3SE_CONSOLE=1 "/full/path/to/bg3se-launch.sh" %command%
+```
+
+and, once the game is running, connect from a terminal:
 
 ```sh
-BG3SE_CONSOLE=1 ./bg3se-launch.sh
+./bg3se-console.sh        # or macOS/scripts/bg3se-console.sh in a source checkout
 ```
+
+Type Lua code, or `server` / `client` to choose which Lua state runs it, `reset` to reload, `help`
+for the rest. The console is served on a Unix socket in
+`~/Library/Application Support/BG3ScriptExtender/` that only your user can open. If the game was
+started from a terminal instead (`BG3SE_ENGINE=2 BG3SE_CONSOLE=1 ./bg3se-launch.sh`, with Steam
+running), the console is also available directly in that terminal.
+
+If the game crashes with the extender loaded, close Larian's crash reporter with **Quit without
+sending**: the crash is the extender's, not the game's.
 
 To remove it, clear the launch options. Nothing inside the game's app bundle is modified.
 
@@ -54,13 +78,13 @@ and use the same keys as the Windows version.
 
 | Environment variable | Effect |
 |--|--|
-| `BG3SE_CONSOLE=1` | Print the console to the terminal and accept Lua input from it |
+| `BG3SE_CONSOLE=1` | Enable the console: on the terminal the game was started from, and on the console socket |
 | `BG3SE_ENGINE=1` | Bind engine symbols; hook and log game state changes |
 | `BG3SE_ENGINE=2` | Also run extender startup (type tables, Lua libraries) and create Lua states |
 | `BG3SE_ENGINE=3` | Also install every engine hook (file reader, ECS update, stats, …) |
 
 The `BG3SE_ENGINE` stages are experimental and exist so that unverified parts can be switched on
-one layer at a time. Expect crashes above the stages listed as verified in the table at the top.
+one layer at a time. Stages 1 and 2 have been run in game; stage 3 has not.
 
 ## Build
 
@@ -95,8 +119,8 @@ The upstream sources are kept as they are wherever possible, so upstream changes
   `concurrent_queue.h` and friends provide the small Win32 / MSVC surface the sources use,
   implemented on POSIX and Mach APIs.
 - **`macOS/Platform/`** replaces the Windows-only translation units: the dylib entry point,
-  the inline hook engine behind the Detours API, Mach-O symbol lookup, and stand-ins for the
-  crash reporter, the SDL input layer and the IMGUI renderer.
+  the inline hook engine behind the Detours API, Mach-O symbol lookup, the console socket, and
+  stand-ins for the crash reporter, the SDL input layer and the IMGUI renderer.
 - **Compiler flags**: `-fms-extensions` and `-fdelayed-template-parsing` make clang accept the
   MSVC dialect the code is written in. The remaining changes to shared code are small and
   guarded (`#if defined(__APPLE__)` / `_MSC_VER`).
@@ -112,6 +136,12 @@ Things established from the macOS game binary so far:
 - The global string table has the Windows layout and is reached through `ls::gst::Add / Get /
   Acquire` and `ls::gst::Map::Release`.
 - Game thread ids are Mach thread ports (`pthread_mach_thread_np`).
+- `ls::STDString` is libc++'s `basic_string` with a 32-bit size type (16 bytes); the extender's
+  `STDString` compiles to the same layout.
+- `ecl::EoCClient`, `esv::EoCServer`, the game state machines and the game state enums match the
+  Windows definitions, apart from one field missing at the start of the client object.
+- Game state listeners are registered by object address (Itanium vtable order).
+- The client state machine's update is inlined; `App::Update` is used as the per-frame client hook.
 - `ls::CriticalSection` is a custom lock, not a `pthread_mutex_t`; game structures that embed
   one (or an SRW lock) still carry Windows layouts in `GameDefinitions/` and are unverified.
 - Functions returning non-trivial objects use `x8` for the result on arm64, where the Windows
