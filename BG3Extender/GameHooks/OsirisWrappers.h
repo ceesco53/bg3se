@@ -51,6 +51,10 @@ public:
     WRAPPABLE(HANDLE(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE), CreateFileW);
     WRAPPABLE(BOOL(HANDLE), CloseHandle);
 
+#if defined(__APPLE__)
+    // libOsiris' exported table of game callbacks (call, query, error, assert)
+    DivFunctions* DarwinDivFunctions{ nullptr };
+#endif
     DivFunctions::CallProc CallOriginal{ nullptr };
     DivFunctions::CallProc QueryOriginal{ nullptr };
     DivFunctions::ErrorMessageProc ErrorOriginal{ nullptr };

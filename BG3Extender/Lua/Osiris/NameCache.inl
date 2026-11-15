@@ -53,7 +53,11 @@ void OsirisNameResolver::RebuildCacheIfNecessary()
     caches_.clear();
     caches_.resize(nextCache_);
 
+#if defined(__APPLE__)
+    if (false) { // adapters are not bound on macOS; calls and queries don't need them
+#else
     if (!binding_.GetIdentityAdapterMap().HasAnyAdapters()) {
+#endif
         OsiErrorS("Couldn't bind Osiris queries - no adapters available (maybe story compile or merge failed?)");
         return;
     }

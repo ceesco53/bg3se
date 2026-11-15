@@ -52,11 +52,11 @@ namespace bg3se
     {
         if (adapter->Constants.Size() > 0) return;
 
-        for (size_t i = 0; i < adapter->VarToColumnMapCount; i++) {
+        for (size_t i = 0; i < adapter->GetVarToColumnMapCount(); i++) {
             if (i != adapter->ColumnToVarMaps[(uint32_t)i]) return;
         }
 
-        adapters_[(uint8_t)adapter->VarToColumnMapCount] = adapter;
+        adapters_[(uint8_t)adapter->GetVarToColumnMapCount()] = adapter;
     }
 
 

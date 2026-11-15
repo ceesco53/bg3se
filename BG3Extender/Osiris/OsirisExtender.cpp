@@ -83,7 +83,8 @@ void OsirisExtender::HookNodeVMTs()
 
 void OsirisExtender::LogError(std::string_view msg)
 {
-    if (storyLoaded_) {
+    // (the game's assert callback is not bound on every platform)
+    if (storyLoaded_ && wrappers_.AssertOriginal != nullptr) {
         std::string log = "[Osiris] {E} ";
         log += msg;
         wrappers_.AssertOriginal(false, log.c_str(), false);
@@ -92,7 +93,8 @@ void OsirisExtender::LogError(std::string_view msg)
 
 void OsirisExtender::LogWarning(std::string_view msg)
 {
-    if (storyLoaded_) {
+    // (the game's assert callback is not bound on every platform)
+    if (storyLoaded_ && wrappers_.AssertOriginal != nullptr) {
         std::string log = "[Osiris] {W} ";
         log += msg;
         wrappers_.AssertOriginal(false, log.c_str(), false);
@@ -101,7 +103,8 @@ void OsirisExtender::LogWarning(std::string_view msg)
 
 void OsirisExtender::LogMessage(std::string_view msg)
 {
-    if (storyLoaded_) {
+    // (the game's assert callback is not bound on every platform)
+    if (storyLoaded_ && wrappers_.AssertOriginal != nullptr) {
         std::string log = "[Osiris] ";
         log += msg;
         wrappers_.AssertOriginal(false, log.c_str(), false);
@@ -255,7 +258,11 @@ void OsirisExtender::OnAfterOsirisLoad(void * Osiris, void * Buf, int retval)
     }
 
     storyLoaded_ = true; 
+#if !defined(__APPLE__) // the node database is not bound on macOS
     DEBUG("ScriptExtender::OnAfterOsirisLoad: %d nodes", (*wrappers_.Globals.Nodes)->Db.Size);
+#else
+    INFO("Osiris story loaded");
+#endif
 
     if (debuggerThread_ && nodeVmtWrappers_) {
         debugger_.reset();

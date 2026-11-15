@@ -26,7 +26,8 @@ Checked in game against version 4.1.1.7631656 (Apple Silicon, Steam).
 | Stats, templates, resources, levels | Unverified: the symbols are mapped, the structure layouts behind them are not checked |
 | Mod loading (`ScriptExtender/Config.json`, bootstrap scripts) | Unverified |
 | Engine hooks (file reader, ECS update, stats; stage 3) | Untested in game |
-| Osiris (`Osi.*`, story events) | Not ported: the library's internal layouts differ on macOS |
+| Osiris calls and queries (`Osi.AddGold(...)`, `Osi.GetHostCharacter()`, …) | Work (stage 2): the functions the game itself implements can be called from the server console |
+| Osiris events, databases, story procs, custom functions | Not ported: they go through Osiris nodes and adapters, whose layouts are not verified on macOS |
 | Client/server messaging (`Ext.Net`) | Disabled: the net message factory layout is unverified |
 | IMGUI overlay | Not ported: needs a Metal backend (the Windows build hooks DX11 / Vulkan) |
 | Input hooks | Not ported: the macOS game does not use SDL |
@@ -66,7 +67,14 @@ and, once the game is running, connect from a terminal:
 ```
 
 Type Lua code, or `server` / `client` to choose which Lua state runs it, `reset` to reload, `help`
-for the rest. The console is served on a Unix socket in
+for the rest. A single command can also be run directly; for example, with a save loaded:
+
+```sh
+./bg3se-console.sh 'Osi.AddGold(Osi.GetHostCharacter(), 1000)'
+```
+
+Osiris functions live in the `Osi` table and run on the server side (the default for one-shot
+commands; use `--client` for the client state). The console is served on a Unix socket in
 `~/Library/Application Support/BG3ScriptExtender/` that only your user can open. The game can also
 be started from a terminal (`./bg3se-launch.sh --engine 2 --console`, with Steam running); the
 console is then available directly in that terminal as well.
@@ -153,6 +161,9 @@ Things established from the macOS game binary so far:
   Windows definitions, apart from one field missing at the start of the client object.
 - Game state listeners are registered by object address (Itanium vtable order).
 - The client state machine's update is inlined; `App::Update` is used as the per-frame client hook.
+- libOsiris is built against libc++: its function, type and parameter tables are `std::map` /
+  `std::list` with libc++ layouts (the Windows definitions reproduce MSVC's). The function records
+  themselves match. The game's call / query handlers are read from the exported `DIV` table.
 - `ls::CriticalSection` is a custom lock, not a `pthread_mutex_t`; game structures that embed
   one (or an SRW lock) still carry Windows layouts in `GameDefinitions/` and are unverified.
 - Functions returning non-trivial objects use `x8` for the result on arm64, where the Windows

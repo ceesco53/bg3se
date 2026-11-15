@@ -149,8 +149,8 @@ void OsirisCallbackManager::RunHandler(ServerState& lua, uint64_t nodeRef, Regis
     auto L = lua.GetState();
     int32_t stackArgs = 1;
     if (tuple != nullptr) {
-        auto node = tuple->Items.Head->Next;
-        while (node != tuple->Items.Head) {
+        auto node = tuple->Items.Sentinel()->Next;
+        while (node != tuple->Items.Sentinel()) {
             node = node->Next;
             stackArgs++;
         }
@@ -164,8 +164,8 @@ void OsirisCallbackManager::RunHandler(ServerState& lua, uint64_t nodeRef, Regis
 
         int32_t numArgs = 0;
         if (tuple != nullptr) {
-            auto node = tuple->Items.Head->Next;
-            while (node != tuple->Items.Head) {
+            auto node = tuple->Items.Sentinel()->Next;
+            while (node != tuple->Items.Sentinel()) {
                 OsiToLua(L, *node->Item);
                 node = node->Next;
                 numArgs++;
@@ -271,6 +271,11 @@ void OsirisCallbackManager::RunHandler(ServerState& lua, uint64_t nodeRef, Regis
 
 void OsirisCallbackManager::StoryLoaded()
 {
+#if defined(__APPLE__)
+    // FIXME(macOS): Osiris event listeners hook node vtables, which are not mapped yet.
+    // Subscriptions are kept, but never fire.
+    return;
+#endif
     HookOsiris();
     storyLoaded_ = true;
     nodeSubscriberRefs_.clear();

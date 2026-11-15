@@ -14,7 +14,7 @@ namespace bg3se::osidbg
 
     void RuleActionMap::AddRuleActionMappings(Node * node, Goal * goal, bool isInit, RuleActionList * actions)
     {
-        auto head = actions->Actions.Head;
+        auto head = actions->Actions.Sentinel();
         auto current = head->Next;
         uint32_t actionIndex = 0;
         while (current != head) {
@@ -401,7 +401,7 @@ namespace bg3se::osidbg
 
         auto & db = dbs.Elements[databaseId - 1];
         auto const & facts = db->Facts;
-        auto head = facts.Head;
+        auto head = facts.Sentinel();
         auto current = head->Next;
 
         messageHandler_.SendBeginDatabaseContents(databaseId);
@@ -556,7 +556,7 @@ namespace bg3se::osidbg
         auto & items = tuple.Items;
         items.Init();
 
-        auto prev = items.Head;
+        auto prev = items.Sentinel();
         for (int i = 0; i < msg.column_size(); i++) {
             auto & param = msg.column()[i];
             prev = items.Insert(prev);
@@ -612,7 +612,7 @@ namespace bg3se::osidbg
             return ResultCode::InvalidParamTupleArity;
         }
 
-        auto typeNode = sig->Params->Params.Head->Next;
+        auto typeNode = sig->Params->Params.Sentinel()->Next;
         for (unsigned i = 0; i < sig->Params->Params.Size; i++) {
             auto typeId = params.column()[i].type_id();
             if (typeId != (uint32_t)ValueType::None
@@ -957,7 +957,7 @@ namespace bg3se::osidbg
             && action->Arguments != nullptr
             && action->Arguments->Args.Size == 1
             && strcmp(action->FunctionName, "DebugBreak") == 0) {
-            TypedValue * message = action->Arguments->Args.Head->Next->Item;
+            TypedValue * message = action->Arguments->Args.Sentinel()->Next->Item;
             if (message->TypeId == ValueType::String
                 && *message->GetString()) {
                 messageHandler_.SendDebugOutput(message->GetString());

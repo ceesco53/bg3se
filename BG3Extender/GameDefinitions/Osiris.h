@@ -408,6 +408,147 @@ struct OsiSequentialArray
     OsiVector<T> Elements;
 };
 
+#if defined(__APPLE__)
+// libOsiris on macOS is built against libc++, so its std::list and std::map have libc++'s layout
+// rather than the MSVC one reproduced in the #else branch. Verified against live data
+// (function table, parameter lists, type table) in game version 4.1.1.7631656.
+
+// libc++ std::list node: { prev, next, value }
+template <class T>
+struct ListNode
+{
+    ListNode<T> * Prev{ nullptr }, * Next{ nullptr };
+    T Item;
+
+    ListNode() {}
+
+    ListNode(T const & item)
+        : Item(item)
+    {}
+};
+
+// libc++ std::list: the sentinel node (prev, next) is embedded at the start of the list object
+template <class T>
+struct List
+{
+    ListNode<T> * Prev{ nullptr };
+    ListNode<T> * Next{ nullptr };
+    uint64_t Size{ 0 };
+
+    // The list's sentinel node: its Next is the first element, and iteration ends when it is reached again.
+    // Only Prev / Next of the sentinel are valid.
+    inline ListNode<T> * Sentinel() const
+    {
+        return reinterpret_cast<ListNode<T> *>(const_cast<List<T> *>(this));
+    }
+
+    void Init()
+    {
+        Prev = Sentinel();
+        Next = Sentinel();
+        Size = 0;
+    }
+
+    // The sentinel is part of the list object; a separately allocated head node is not used
+    void Init(ListNode<T> * unused)
+    {
+        Init();
+    }
+
+    void Insert(ListNode<T> * item, ListNode<T> * prev)
+    {
+        item->Prev = prev;
+        item->Next = prev->Next;
+        prev->Next->Prev = item;
+        prev->Next = item;
+        Size++;
+    }
+
+    void Insert(T const & value, ListNode<T> * item, ListNode<T> * prev)
+    {
+        item->Item = value;
+        Insert(item, prev);
+    }
+
+    ListNode<T> * Insert(T const & value, ListNode<T> * prev)
+    {
+        auto item = new ListNode<T>(value);
+        Insert(item, prev);
+        return item;
+    }
+
+    ListNode<T> * Insert(ListNode<T> * prev)
+    {
+        auto item = new ListNode<T>();
+        Insert(item, prev);
+        return item;
+    }
+};
+
+// libc++ std::map node: { left, right, parent, is_black, value }; missing children are null
+template <typename TKey, typename TVal>
+struct TMapNode
+{
+    struct KeyValuePair
+    {
+        TKey Key;
+        TVal Value;
+    };
+
+    TMapNode<TKey, TVal> * Left;
+    TMapNode<TKey, TVal> * Right;
+    TMapNode<TKey, TVal> * Parent;
+    bool IsBlack;
+    KeyValuePair KV;
+};
+
+// libc++ std::map: { begin node, end node (its left child is the root), size }.
+// NOTE: unlike the MSVC TMap below, this includes the element count.
+template <typename TKey, typename TVal, class Pred = std::less<TKey>>
+struct TMap
+{
+    TMapNode<TKey, TVal> * Begin;
+    TMapNode<TKey, TVal> * Root;
+    uint64_t Size;
+
+    TVal * Find(TKey const & key)
+    {
+        TMapNode<TKey, TVal> * candidate = nullptr;
+        auto current = Root;
+        while (current != nullptr)
+        {
+            if (Pred()(current->KV.Key, key)) {
+                current = current->Right;
+            } else {
+                candidate = current;
+                current = current->Left;
+            }
+        }
+
+        if (candidate == nullptr || Pred()(key, candidate->KV.Key))
+            return nullptr;
+        else
+            return &candidate->KV.Value;
+    }
+
+    template <class Visitor>
+    void Iterate(Visitor visitor)
+    {
+        Iterate(Root, visitor);
+    }
+
+    template <class Visitor>
+    void Iterate(TMapNode<TKey, TVal> * node, Visitor visitor)
+    {
+        if (node != nullptr) {
+            visitor(node->KV.Key, node->KV.Value);
+            Iterate(node->Left, visitor);
+            Iterate(node->Right, visitor);
+        }
+    }
+};
+
+#else
 template <class T>
 struct ListNode
 {
@@ -426,6 +567,12 @@ struct List
 {
     ListNode<T> * Head{ nullptr };
     uint64_t Size{ 0 };
+
+    // The list's sentinel node: its Next is the first element, and iteration ends when it is reached again
+    inline ListNode<T> * Sentinel() const
+    {
+        return Head;
+    }
 
     void Init()
     {
@@ -536,6 +683,8 @@ struct TMap
 };
 
 
+#endif
+
 struct TypeDbLess
 {
     bool operator ()(OsiString const & a, OsiString const & b) const
@@ -550,7 +699,9 @@ struct TypeDb : public ProtectedGameObject<TypeDb<TValue>>
     struct HashSlot
     {
         TMap<OsiString, TValue, TypeDbLess> NodeMap;
+#if !defined(__APPLE__)
         void * Unknown;
+#endif
     };
 
     TValue * Find(uint32_t hash, OsiString const & key)
@@ -792,7 +943,13 @@ struct Adapter : public ProtectedGameObject<Adapter>
 {
     uint32_t Id;
     TMap<uint8_t, uint8_t> VarToColumnMaps;
+#if defined(__APPLE__)
+    // The element count is part of the libc++ map itself
+    inline uint64_t GetVarToColumnMapCount() const { return VarToColumnMaps.Size; }
+#else
     uint64_t VarToColumnMapCount;
+    inline uint64_t GetVarToColumnMapCount() const { return VarToColumnMapCount; }
+#endif
     Vector<int8_t> ColumnToVarMaps;
     SmallTuple Constants;
 };
@@ -1190,7 +1347,9 @@ struct FunctionDb : public TypeDb<OsiFunctionDef*>
     struct FunctionIdHashSlot
     {
         TMap<uint32_t, OsiFunctionDef*> NodeMap;
+#if !defined(__APPLE__)
         void* Unknown;
+#endif
     };
 
     OsiFunctionDef** FindById(uint32_t id)
@@ -1201,7 +1360,9 @@ struct FunctionDb : public TypeDb<OsiFunctionDef*>
 
     FunctionIdHashSlot FunctionIdHash[1023];
     TMap<uint32_t, uint32_t> AllFunctionIds;
+#if !defined(__APPLE__)
     void* U1;
+#endif
     uint32_t U2;
     void* U3[8];
 };
@@ -1287,3 +1448,17 @@ struct OsirisDynamicGlobals
 };
 
 }
+
+#if defined(__APPLE__)
+// Checked against the live Osiris data in the macOS game
+static_assert(sizeof(bg3se::OsiString) == 24);
+static_assert(sizeof(bg3se::TypeDb<bg3se::OsiFunctionDef*>::HashSlot) == 24);
+namespace bg3se { using OsiFunctionMapNode = TMapNode<OsiString, OsiFunctionDef*>; }
+static_assert(offsetof(bg3se::OsiFunctionMapNode, KV) == 0x20);
+static_assert(offsetof(bg3se::OsiFunctionDef, Signature) == 0x18);
+static_assert(offsetof(bg3se::OsiFunctionDef, Type) == 0x24);
+static_assert(offsetof(bg3se::OsiFunctionDef, Key) == 0x28);
+static_assert(offsetof(bg3se::FunctionParamList, Params) == 0x08);
+static_assert(offsetof(bg3se::ListNode<bg3se::FunctionParamDesc>, Item) == 0x10);
+static_assert(offsetof(bg3se::OsiTypeDb, Aliases) == 1023 * 24 + 8);
+#endif

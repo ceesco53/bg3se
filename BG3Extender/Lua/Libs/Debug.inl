@@ -119,7 +119,7 @@ STDString DoGenerateIdeHelpers(bool builtinOnly)
         auto const & outParams = func->Signature->OutParamList;
         auto numOutParams = outParams.numOutParams();
 
-        auto types = func->Signature->Params->Params.Head;
+        auto types = func->Signature->Params->Params.Sentinel();
         for (auto i = 0; i < func->Signature->Params->Params.Size; i++) {
             types = types->Next;
 
@@ -133,7 +133,7 @@ STDString DoGenerateIdeHelpers(bool builtinOnly)
         }
 
         if (numOutParams > 0) {
-            auto types = func->Signature->Params->Params.Head;
+            auto types = func->Signature->Params->Params.Sentinel();
             for (auto i = 0; i < func->Signature->Params->Params.Size; i++) {
                 types = types->Next;
 

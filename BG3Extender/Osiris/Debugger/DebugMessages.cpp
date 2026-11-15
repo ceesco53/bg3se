@@ -55,7 +55,7 @@ namespace bg3se::osidbg
     void MakeMsgTuple(MsgTuple & msgTuple, TuplePtrLL const & tuple)
     {
         auto const & items = tuple.Items;
-        auto head = items.Head;
+        auto head = items.Sentinel();
         auto col = head->Next;
         while (col != head) {
             auto column = msgTuple.add_column();
@@ -124,7 +124,7 @@ namespace bg3se::osidbg
     void DebugDumpTuple(std::stringstream & ss, TuplePtrLL const & tuple)
     {
         auto const & items = tuple.Items;
-        auto head = items.Head;
+        auto head = items.Sentinel();
         auto cur = head->Next;
         while (cur != head) {
             DebugDumpTV(ss, *cur->Item);
@@ -223,7 +223,7 @@ namespace bg3se::osidbg
 
     void AddActionInfo(RuleActionList * actions, std::function<MsgActionInfo * ()> addAction)
     {
-        auto head = actions->Actions.Head;
+        auto head = actions->Actions.Sentinel();
         auto current = head->Next;
         uint32_t actionIndex = 0;
         while (current != head) {

@@ -6,6 +6,18 @@ using namespace bg3se::lua;
 
 bool OsiFunction::Bind(OsiFunctionDef const * func, OsirisBinding& binding)
 {
+#if defined(__APPLE__)
+    // Only functions implemented by the game itself can be bound on macOS so far: they go straight
+    // to the game's call / query handlers. Story procs, databases and user queries are executed
+    // through Osiris nodes and adapters, whose layouts are not verified here yet.
+    if (func->Type != FunctionType::Call && func->Type != FunctionType::Query) {
+        return false;
+    }
+
+    function_ = func;
+    return true;
+#endif
+
     if (func->Type == FunctionType::Query
         || func->Type == FunctionType::SysQuery
         || func->Type == FunctionType::UserQuery
@@ -114,7 +126,7 @@ int OsiFunction::LuaGet(lua_State * L) const
     auto db = function_->Node.Get()->Database.Get();
         
 
-    auto head = db->Facts.Head;
+    auto head = db->Facts.Sentinel();
     auto current = head->Next;
 
     lua_newtable(L);
@@ -256,7 +268,7 @@ void OsiFunction::OsiCall(lua_State * L) const
 
     auto state = ServerState::FromLua(L);
     OsiArgumentListPin<OsiArgumentDesc> args(state->Osiris().GetArgumentDescPool(), (uint32_t)funcArgs);
-    auto argType = function_->Signature->Params->Params.Head->Next;
+    auto argType = function_->Signature->Params->Params.Sentinel()->Next;
     for (uint32_t i = 0; i < funcArgs; i++) {
         auto arg = args.Args() + i;
         if (i > 0) {
@@ -326,10 +338,10 @@ void OsiFunction::OsiInsert(lua_State * L, bool deleteTuple) const
 
     TuplePtrLL tuple;
     auto & args = tuple.Items;
-    auto argType = function_->Signature->Params->Params.Head->Next;
+    auto argType = function_->Signature->Params->Params.Sentinel()->Next;
     args.Init(nodes.Args());
 
-    auto prev = args.Head;
+    auto prev = args.Sentinel();
     for (uint32_t i = 0; i < funcArgs; i++) {
         auto tv = tvs.Args() + i;
         LuaToOsi(L, i + 2, *tv, (ValueType)argType->Item.Type, deleteTuple);
@@ -361,7 +373,7 @@ int OsiFunction::OsiQuery(lua_State * L) const
 
     auto state = ServerState::FromLua(L);
     OsiArgumentListPin<OsiArgumentDesc> args(state->Osiris().GetArgumentDescPool(), (uint32_t)numParams);
-    auto argType = function_->Signature->Params->Params.Head->Next;
+    auto argType = function_->Signature->Params->Params.Sentinel()->Next;
     uint32_t inputArg = 2;
     for (uint32_t i = 0; i < numParams; i++) {
         auto arg = args.Args() + i;
@@ -417,7 +429,7 @@ int OsiFunction::OsiUserQuery(lua_State * L) const
     SmallTuple args;
     args.Reserve((uint32_t)numParams);
  
-    auto argType = function_->Signature->Params->Params.Head->Next;
+    auto argType = function_->Signature->Params->Params.Sentinel()->Next;
 
     uint32_t inputArgIndex = 0;
     for (uint32_t i = 0; i < numParams; i++) {
@@ -435,7 +447,7 @@ int OsiFunction::OsiUserQuery(lua_State * L) const
     bool valid = node->IsValid(&args, adapter_.Id);
     if (valid) {
         if (outParams > 0) {
-            auto retType = function_->Signature->Params->Params.Head->Next;
+            auto retType = function_->Signature->Params->Params.Sentinel()->Next;
             for (uint32_t i = 0; i < numParams; i++) {
                 if (function_->Signature->OutParamList.isOutParam(i)) {
                     OsiToLua(L, args[i]);

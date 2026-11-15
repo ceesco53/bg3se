@@ -52,14 +52,11 @@ void OsirisWrappers::RegisterDIVFunctionsPreHook(void * Osiris, DivFunctions * F
 void OsirisWrappers::Initialize()
 {
 #if defined(__APPLE__)
-    // FIXME(macOS): libOsiris.dylib exports everything hooked below (COsiris::RegisterDIVFunctions,
-    // InitGame, Load, Event, ... and the manager globals), but its internal databases use libc++
-    // containers whose layouts differ from the Windows definitions in GameDefinitions/Osiris.h.
-    // Until those are verified, Osiris is left unhooked rather than read through wrong layouts.
-    WARN("Osiris integration is not available on macOS yet; Osi.* calls and Osiris event listeners are disabled.");
-
-    // Shared code tests `*Globals.X == nullptr` to tell whether a story is loaded. Point every
-    // global at an empty slot so that it sees "no story" instead of dereferencing a null pointer.
+    // libOsiris.dylib exports its entry points and manager globals by name, so nothing is located
+    // by pattern here. What is bound so far is what calling Osiris functions from Lua needs:
+    // the function and type tables, the game's call / query entry points, and story (re)load.
+    // Databases, nodes, adapters and the string table keep empty targets: their internals are not
+    // verified on macOS, and shared code treats a null manager as "not available".
     static void* emptySlot{ nullptr };
     static DebugFlag debugFlags{};
     Globals.StringTable = reinterpret_cast<COsiStringTable***>(&emptySlot);
@@ -73,6 +70,35 @@ void OsirisWrappers::Initialize()
     Globals.Databases = reinterpret_cast<DatabaseDb**>(&emptySlot);
     Globals.Nodes = reinterpret_cast<NodeDb**>(&emptySlot);
     Globals.DebugFlags = &debugFlags;
+
+    auto osiSymbol = [](char const* name) { return darwin::FindSymbol("libOsiris.dylib", name); };
+    auto functions = osiSymbol("OsiFunctionMan");
+    auto types = osiSymbol("OsiDIVObjectTypesMan");
+    DarwinDivFunctions = reinterpret_cast<DivFunctions*>(osiSymbol("DIV"));
+    auto load = osiSymbol("_ZN7COsiris4LoadER12COsiSmartBuf");
+    auto initGame = osiSymbol("_ZN7COsiris8InitGameEv");
+    auto deleteAllData = osiSymbol("_ZN7COsiris13DeleteAllDataEb");
+    if (!functions || !types || !DarwinDivFunctions || !load || !initGame || !deleteAllData) {
+        DarwinDivFunctions = nullptr;
+        WARN("Osiris symbols not found in libOsiris.dylib; Osi.* calls are unavailable.");
+        return;
+    }
+
+    Globals.Functions = reinterpret_cast<FunctionDb**>(functions);
+    Globals.Types = reinterpret_cast<OsiTypeDb**>(types);
+
+    DetourTransactionBegin();
+    DetourUpdateThread(GetCurrentThread());
+    InitGame.Wrap(initGame);
+    DeleteAllData.Wrap(deleteAllData);
+    Load.Wrap(load);
+    // As on Windows, the extender's own call / query entry points are hooked so that
+    // CallWithHooks() has a trampoline to continue through.
+    Call.Wrap(&CallWrapper);
+    Query.Wrap(&QueryWrapper);
+    DetourTransactionCommit();
+
+    INFO("Osiris: function calls and queries are available (events, databases and custom functions are not ported yet)");
     return;
 #endif
 
@@ -191,7 +217,14 @@ bool OsirisWrappers::CallWrapper(uint32_t FunctionId, OsiArgumentDesc * Params)
         wrappers->OsirisCallbacksAttachment->CallPreHook(FunctionId, Params);
     }
 
+#if defined(__APPLE__)
+    // The game's handlers live in libOsiris' DIV table (filled in when the story engine is created)
+    auto callOriginal = osi.GetWrappers().DarwinDivFunctions ? osi.GetWrappers().DarwinDivFunctions->Call : nullptr;
+    if (callOriginal == nullptr) return false;
+    bool succeeded = callOriginal(FunctionId, Params);
+#else
     bool succeeded = osi.GetWrappers().CallOriginal(FunctionId, Params);
+#endif
 
     if (wrappers && wrappers->OsirisCallbacksAttachment) {
         wrappers->OsirisCallbacksAttachment->CallPostHook(FunctionId, Params, succeeded);
@@ -209,7 +242,13 @@ bool OsirisWrappers::QueryWrapper(uint32_t FunctionId, OsiArgumentDesc * Params)
         wrappers->OsirisCallbacksAttachment->CallPreHook(FunctionId, Params);
     }
 
+#if defined(__APPLE__)
+    auto queryOriginal = osi.GetWrappers().DarwinDivFunctions ? osi.GetWrappers().DarwinDivFunctions->Query : nullptr;
+    if (queryOriginal == nullptr) return false;
+    bool succeeded = queryOriginal(FunctionId, Params);
+#else
     bool succeeded = osi.GetWrappers().QueryOriginal(FunctionId, Params);
+#endif
 
     if (wrappers && wrappers->OsirisCallbacksAttachment) {
         wrappers->OsirisCallbacksAttachment->CallPostHook(FunctionId, Params, succeeded);

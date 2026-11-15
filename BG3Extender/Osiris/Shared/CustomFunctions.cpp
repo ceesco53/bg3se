@@ -537,7 +537,7 @@ void OsiFunctionToSymbolInfo(OsiFunctionDef& func, OsiSymbolInfo & symbol)
 
     symbol.params.resize(func.Signature->Params->Params.Size);
     uint32_t paramIdx = 0;
-    auto paramHead = func.Signature->Params->Params.Head;
+    auto paramHead = func.Signature->Params->Params.Sentinel();
     auto param = paramHead->Next;
     while (param != paramHead) {
         symbol.params[paramIdx].output = func.Signature->OutParamList.isOutParam(paramIdx);
