@@ -90,7 +90,9 @@ void ScriptExtender::Initialize()
 
     if (Libraries.GetGameVersion(gameVersion_)) {
         if (gameVersion_.IsSupported()) {
+#if !defined(__APPLE__) // logged with the full bundle build number in FindLibrariesDarwin
             INFO("Game version v%d.%d.%d.%d OK", gameVersion_.Major, gameVersion_.Minor, gameVersion_.Revision, gameVersion_.Build);
+#endif
         } else {
             ERR("Game version v%d.%d.%d.%d is not supported, please upgrade!", gameVersion_.Major, gameVersion_.Minor, gameVersion_.Revision, gameVersion_.Build);
             // Hard exit below a certain version as the EoCClient error display UI won't work anymore
@@ -491,6 +493,40 @@ public:
     uint64_t dummy{ 0 };
 };
 
+#if defined(__APPLE__)
+void ScriptExtender::OnAppLoadGraphicSettings(void* self, void* initStruct, std::uintptr_t result)
+{
+    HookStateMachineUpdates();
+}
+
+void ScriptExtender::HookStateMachineUpdates()
+{
+    if (updateHooksAdded_ || Libraries.CriticalInitializationFailed()) return;
+
+    std::lock_guard _(stateHookMutex_);
+
+    // Each entry of the manager's callback list points at a listener object, i.e. at its vtable
+    // pointer: { ~dtor (2 slots), OnGameStateChanged(event const&), OnTickLoad(event const&) }.
+    // The hook classes above have exactly that shape when compiled for the Itanium ABI.
+    auto clientEvtMgr = GetStaticSymbols().ecl__gGameStateEventManager;
+    if (!clientStateHookAdded_ && clientEvtMgr && *clientEvtMgr) {
+        auto client = GameAlloc<ClientEventManagerHook>();
+        (*clientEvtMgr)->Callbacks.push_back(client);
+        clientStateHookAdded_ = true;
+        INFO("Registered client game state listener");
+    }
+
+    auto serverEvtMgr = GetStaticSymbols().esv__gGameStateEventManager;
+    if (!serverStateHookAdded_ && serverEvtMgr && *serverEvtMgr) {
+        auto server = GameAlloc<ServerEventManagerHook>();
+        (*serverEvtMgr)->Callbacks.push_back(server);
+        serverStateHookAdded_ = true;
+        INFO("Registered server game state listener");
+    }
+
+    updateHooksAdded_ = clientStateHookAdded_ && serverStateHookAdded_;
+}
+#else
 void ScriptExtender::OnAppLoadGraphicSettings(App * self)
 {
     HookStateMachineUpdates();
@@ -514,6 +550,7 @@ void ScriptExtender::HookStateMachineUpdates()
 
     updateHooksAdded_ = true;
 }
+#endif
 
 void ScriptExtender::ClearPathOverrides()
 {
@@ -573,6 +610,9 @@ FileReader * ScriptExtender::OnFileReaderCreate(FileReader__CtorProc* next, File
 void ScriptExtender::PostStartup()
 {
     if (postStartupDone_) return;
+#if defined(__APPLE__)
+    if (darwin::EngineStage() < 2) return;
+#endif
 
     std::lock_guard _(globalStateLock_);
     // We need to initialize the function library here, as GlobalAllocator isn't available in Init().
@@ -588,8 +628,13 @@ void ScriptExtender::PostStartup()
         FixedString cast("Cast");
         const_cast<FixedStringBase::Header*>(cast.GetMetadata())->RefCount = 100000;
 
-        engineHooks_.HookAll();
-        hooks_.Startup();
+#if defined(__APPLE__)
+        if (darwin::EngineStage() >= 3)
+#endif
+        {
+            engineHooks_.HookAll();
+            hooks_.Startup();
+        }
         server_.PostStartup();
         client_.PostStartup();
 

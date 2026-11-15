@@ -152,7 +152,10 @@ struct EoCClient : public ProtectedGameObject<EoCClient>
 {
     void* VMT_InputEventListener;
     void* VMT_NetEventListener;
+#if !defined(__APPLE__)
+    // Not present in the macOS build (verified against the live object, game 4.1.1.7631656)
     void* field_10;
+#endif
     void* VMT_DLCEventListener;
     void* VMT_MessageBoxOwner;
     UnknownSignal ComponentCallbacks;
@@ -202,3 +205,13 @@ struct EoCClient : public ProtectedGameObject<EoCClient>
 };
 
 END_NS()
+
+#if defined(__APPLE__)
+// Layouts verified against live objects in the macOS game (4.1.1.7631656)
+static_assert(offsetof(bg3se::ecl::EoCClient, GameStateMachine) == 0x88);
+static_assert(offsetof(bg3se::ecl::EoCClient, ModManager) == 0x138);
+static_assert(offsetof(bg3se::ecl::EoCClient, EntityWorld) == 0x1A0);
+static_assert(offsetof(bg3se::ecl::GameStateMachine, State) == 0x08);
+static_assert(offsetof(bg3se::esv::EoCServer, GameStateMachine) == 0xA0);
+static_assert(offsetof(bg3se::esv::EoCServer, ModManager) == 0xD0);
+#endif

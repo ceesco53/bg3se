@@ -78,8 +78,7 @@ namespace bg3se {
             INFO("macOS game build %d.%d.%d.%u", version.Major, version.Minor, version.Revision, version.BundleBuild);
         }
 
-        auto engineEnv = getenv("BG3SE_ENGINE");
-        bool bindSymbols = engineEnv != nullptr && strcmp(engineEnv, "1") == 0;
+        bool bindSymbols = darwin::EngineStage() >= 1;
 
         // <Symbol Name="(StaticSymbols member)" Mangled="(Mach-O symbol)" [Image="..."] [Critical="true"] />
         unsigned mapped{ 0 }, missing{ 0 };
@@ -129,11 +128,13 @@ namespace bg3se {
                 && darwin::FindSymbol(nullptr, "_ZN2ls3gst3AddERKNS_11_StringViewIcEE") != nullptr
                 && darwin::FindSymbol(nullptr, "_ZN2ls3gst10s_InstanceE") != nullptr;
             INFO("Global string table: %s", gstOk ? "resolved" : "NOT FOUND");
-            INFO("Running in diagnostic mode: engine integration is disabled (set BG3SE_ENGINE=1 to enable the experimental engine hooks).");
+            INFO("Running in diagnostic mode: engine integration is disabled (see BG3SE_ENGINE in macOS/README.md for the experimental stages).");
             CriticalInitFailed = true;
             DiagnosticMode = true;
             return false;
         }
+
+        INFO("Engine integration stage %d (experimental)", darwin::EngineStage());
 
         // The game allocates with the system allocator (ls::MemoryManager wraps malloc / free),
         // which BG3Alloc / BG3Free fall back to when no allocator symbols are bound.

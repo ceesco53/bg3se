@@ -28,6 +28,8 @@
     <Symbol Name="ls__gDragDropManager" Mangled="_ZN2ls15DragDropManager5m_ptrE" />
 
     <!-- Client / server -->
+    <!-- App::LoadGraphicSettingsConfig(ls::InitStruct&); hooked with a two-argument pass-through signature -->
+    <Symbol Name="App__LoadGraphicSettings" Mangled="_ZN3App25LoadGraphicSettingsConfigERN2ls10InitStructE" />
     <Symbol Name="ecl__EoCClient" Mangled="_ZN3ecl9EocClient5m_ptrE" Critical="true" />
     <Symbol Name="esv__EoCServer" Mangled="_ZN3esv9EocServer5m_ptrE" Critical="true" />
     <Symbol Name="ecl__EoCClient__HandleError" Mangled="_ZN3ecl9EocClient11HandleErrorERKN2ls16TranslatedStringEbS4_N3eoc18EMessageBoxLocalIdE" />
@@ -63,7 +65,7 @@
         ls__AppliedMaterial__TryOverrideTexture2DParameter  (FixedString const&, FixedString const&, bool)  (extra bool)
         Noesis__*                                           return Noesis::Ptr<> / Point by value (x8 on arm64)
       Not found by name (inlined or renamed; need locating by analysis):
-        ls__PathRoots (ls::Path::s_Roots has a different shape), App__Ctor, App__UpdatePaths, App__LoadGraphicSettings,
+        ls__PathRoots (ls::Path::s_Roots has a different shape), App__Ctor, App__UpdatePaths,
         AppInstance, esv__GameStateThreaded__GameStateWorker__DoWork, ecl__GameStateMachine__Update, RPGStats__Load,
         RPGStats__ParseDataBuffers, the esv__ExecuteStatsFunctor_* family, eoc__PassivePrototype*, Noesis reflection data.
     -->

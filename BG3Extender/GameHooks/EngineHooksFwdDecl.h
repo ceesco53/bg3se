@@ -31,7 +31,13 @@ using AiGrid__FindPathImmediateProc = bool(AiGrid* self, AiPathId pathId);
 
 using Visual__UpdateBlendshapeWeightsFromSkeletonProc = void(Visual* self);
 
+#if defined(__APPLE__)
+// App::LoadGraphicSettingsConfig(ls::InitStruct&): both argument registers and the return value
+// are passed through untouched.
+using App__LoadGraphicSettingsProc = std::uintptr_t (void*, void*);
+#else
 using App__LoadGraphicSettingsProc = void (App*);
+#endif
 using App__CtorProc = App* (App*);
 using App__UpdatePathsProc = void (App*);
 

@@ -148,6 +148,9 @@ void CleanupSanityCheck()
 
 void ScriptExtender::OnGameStateChanged(GameState fromState, GameState toState)
 {
+#if defined(__APPLE__)
+    INFO("Client game state: %d -> %d", (int)fromState, (int)toState);
+#endif
     if (config_.SendCrashReports) {
         // We need to initialize the crash reporter after the game engine has started,
         // otherwise the game will overwrite the top level exception filter
@@ -287,6 +290,9 @@ void ScriptExtender::OnGameStateChanged(GameState fromState, GameState toState)
 
 void ScriptExtender::GameStateWorkerWrapper(void (*wrapped)(void*), void* self)
 {
+#if defined(__APPLE__)
+    gExtender->HookStateMachineUpdates();
+#endif
     ContextGuard _(ContextType::Client);
     wrapped(self);
 }
@@ -417,6 +423,9 @@ void ScriptExtender::ResetExtensionState()
 
 void ScriptExtender::LoadExtensionState(ExtensionStateContext ctx)
 {
+#if defined(__APPLE__)
+    if (darwin::EngineStage() < 2) return;
+#endif
     if (extensionLoaded_ && (!extensionState_ || ctx == extensionState_->Context())) {
         return;
     }

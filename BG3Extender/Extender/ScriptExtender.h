@@ -200,8 +200,20 @@ private:
     void WarnIfOffline();
     void OnCoreLibInit(void * self);
     void OnAppUpdatePaths(App* self);
+#if defined(__APPLE__)
+    void OnAppLoadGraphicSettings(void* self, void* initStruct, std::uintptr_t result);
+public:
+    // Also called from the state hooks: on macOS the event managers may not exist yet when the
+    // graphics settings are loaded.
+    void HookStateMachineUpdates();
+private:
+    bool clientStateHookAdded_{ false };
+    bool serverStateHookAdded_{ false };
+    std::mutex stateHookMutex_;
+#else
     void OnAppLoadGraphicSettings(App* self);
     void HookStateMachineUpdates();
+#endif
     void OnStatsLoad(stats::RPGStats__LoadProc* wrapped, stats::RPGStats* mgr, Array<STDString>* paths);
     void OnStatsLoadGuarded(stats::RPGStats__LoadProc* wrapped, stats::RPGStats* mgr, Array<STDString>* paths);
     void OnECSUpdate(ecs::EntityWorld__UpdateProc* wrapped, ecs::EntityWorld* entityWorld, GameTime const& time);

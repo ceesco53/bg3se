@@ -13,12 +13,12 @@ verified and is switched off by default. See [What works](#what-works) before in
 | Area | State |
 |--|--|
 | Build | All of the extender (CoreLib, Lua, Osiris, IMGUI and game definition code) compiles and links with Apple clang for arm64 |
-| Loading | Injected with `DYLD_INSERT_LIBRARIES`; initializes at the game's `main()` |
+| Loading | Injected with `DYLD_INSERT_LIBRARIES`; initializes at the game's `main()`. Verified in game |
 | Function hooking | arm64 inline hook engine with instruction relocation; covered by tests |
-| Engine symbols | Resolved by name from the game's symbol table; 36 of the extender's 99 engine symbols are mapped so far |
+| Engine symbols | Resolved by name from the game's symbol table; 37 of the extender's 99 engine symbols are mapped so far. Verified in game |
 | Console / log | Console output is written to `~/Library/Application Support/BG3ScriptExtender/bg3se.log` |
 | Lua, `Ext.*`, mods | **Not working yet.** Needs the engine hooks below |
-| Engine hooks (game state, ECS, stats) | Experimental and **untested in game**; off unless `BG3SE_ENGINE=1` |
+| Engine hooks (game state, ECS, stats) | Experimental; off by default, enabled in stages with `BG3SE_ENGINE` |
 | Osiris (`Osi.*`, story events) | Not ported: the library's internal layouts differ on macOS |
 | IMGUI overlay | Not ported: needs a Metal backend (the Windows build hooks DX11 / Vulkan) |
 | Input hooks | Not ported: the macOS game does not use SDL |
@@ -55,7 +55,12 @@ and use the same keys as the Windows version.
 | Environment variable | Effect |
 |--|--|
 | `BG3SE_CONSOLE=1` | Print the console to the terminal and accept Lua input from it |
-| `BG3SE_ENGINE=1` | Bind engine symbols and install the engine hooks. Experimental: expect crashes |
+| `BG3SE_ENGINE=1` | Bind engine symbols; hook and log game state changes |
+| `BG3SE_ENGINE=2` | Also run extender startup (type tables, Lua libraries) and create Lua states |
+| `BG3SE_ENGINE=3` | Also install every engine hook (file reader, ECS update, stats, …) |
+
+The `BG3SE_ENGINE` stages are experimental and exist so that unverified parts can be switched on
+one layer at a time. Expect crashes above the stages listed as verified in the table at the top.
 
 ## Build
 

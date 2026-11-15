@@ -43,6 +43,17 @@ std::string GetExtenderDataDir()
     }
 }
 
+int EngineStage()
+{
+    static int stage = [] {
+        auto env = getenv("BG3SE_ENGINE");
+        if (env == nullptr) return 0;
+        auto value = atoi(env);
+        return value < 0 ? 0 : (value > 3 ? 3 : value);
+    }();
+    return stage;
+}
+
 void ShowAlert(char const* title, char const* message)
 {
     NSString* nsTitle = [NSString stringWithUTF8String:title ? title : ""];

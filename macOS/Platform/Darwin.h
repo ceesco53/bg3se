@@ -49,6 +49,14 @@ void* GetMainEntryPoint();
 // Contents of a resource embedded in the extender dylib (section in the __SE_RES segment)
 std::optional<std::string> GetEmbeddedResource(char const* name);
 
+// How much of the engine integration is switched on (BG3SE_ENGINE). Each stage adds to the
+// previous one, so that unverified parts can be enabled one layer at a time:
+//   0  diagnostic: resolve and report engine symbols, bind nothing (default)
+//   1  bind symbols; hook and log game state changes
+//   2  + extender startup (type tables, Lua libraries) and Lua extension states
+//   3  + all engine hooks (file reader, ECS update, stats, ...)
+int EngineStage();
+
 // Blocking native alert; safe to call from any thread
 void ShowAlert(char const* title, char const* message);
 

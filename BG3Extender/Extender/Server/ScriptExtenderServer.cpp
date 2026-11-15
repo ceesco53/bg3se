@@ -110,6 +110,9 @@ bool IsLoadingState(GameState state)
 
 void ScriptExtender::OnGameStateChanged(GameState fromState, GameState toState)
 {
+#if defined(__APPLE__)
+    INFO("Server game state: %d -> %d", (int)fromState, (int)toState);
+#endif
 #if defined(DEBUG_SERVER_CLIENT)
         DEBUG("esv::ScriptExtender::OnGameStateChanged(): %s -> %s", 
             GameStateNames[(unsigned)fromState], GameStateNames[(unsigned)toState]);
@@ -199,6 +202,9 @@ void ScriptExtender::GameStateWorkerWrapper(void (* wrapped)(void *), void* self
 
 void ScriptExtender::PreUpdate(void* self, GameTime* time)
 {
+#if defined(__APPLE__)
+    gExtender->HookStateMachineUpdates();
+#endif
     network_.Update();
     RunPendingTasks();
     if (extensionState_) {
@@ -261,6 +267,9 @@ void ScriptExtender::ResetExtensionState()
 
 void ScriptExtender::LoadExtensionState(ExtensionStateContext ctx)
 {
+#if defined(__APPLE__)
+    if (darwin::EngineStage() < 2) return;
+#endif
     if (extensionLoaded_ && (!extensionState_ || ctx == extensionState_->Context())) {
         return;
     }
