@@ -355,7 +355,7 @@ namespace bg3se
 
     std::optional<int> ExtensionStateBase::LuaLoadExternalFile(STDString const & path)
     {
-        std::ifstream f(path.c_str(), std::ios::in | std::ios::binary);
+        std::ifstream f(FsPath(path), std::ios::in | std::ios::binary);
         if (!f.good()) {
             OsiError("File does not exist: " << path);
             return {};

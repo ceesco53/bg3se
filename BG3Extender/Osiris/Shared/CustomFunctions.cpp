@@ -443,7 +443,7 @@ void CustomFunctionManager::PreProcessStory(wchar_t const * path)
     STDString postProcessed;
 
     {
-        std::ifstream f(path, std::ios::in | std::ios::binary);
+        std::ifstream f(FsPath(path), std::ios::in | std::ios::binary);
         if (!f.good()) return;
 
         f.seekg(0, std::ios::end);
@@ -467,7 +467,7 @@ void CustomFunctionManager::PreProcessStory(wchar_t const * path)
     }
 
     {
-        std::ofstream f(path, std::ios::out | std::ios::binary);
+        std::ofstream f(FsPath(path), std::ios::out | std::ios::binary);
         if (!f.good()) return;
 
         f.write(postProcessed.data(), postProcessed.size());
@@ -681,7 +681,7 @@ void CustomFunctionInjector::ExtendStoryHeader(std::wstring const & headerPath)
 #endif
 
     auto headers = functions_.GenerateHeaders();
-    std::ofstream wf(headerPath.c_str(), std::ios::out | std::ios::binary | std::ios::app);
+    std::ofstream wf(FsPath(headerPath), std::ios::out | std::ios::binary | std::ios::app);
     wf.write(headers.data(), headers.size());
     wf.close();
 
@@ -698,7 +698,7 @@ void CustomFunctionInjector::AddJunkToStory(std::wstring const& storyPath)
 {
     extendingStory_ = true;
 
-    std::ofstream wf(storyPath.c_str(), std::ios::out | std::ios::binary | std::ios::app);
+    std::ofstream wf(FsPath(storyPath), std::ios::out | std::ios::binary | std::ios::app);
     wf.write("\r\nJUNK JUNK JUNK JUNK JUNK\r\n", 28);
     wf.close();
 

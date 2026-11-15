@@ -67,7 +67,7 @@ std::optional<STDString> LoadExternalFile(std::string_view path, PathRootType ro
         auto absolutePath = GetPathForExternalIo(path, root);
         if (!absolutePath) return {};
 
-        std::ifstream f(absolutePath->c_str(), std::ios::in | std::ios::binary);
+        std::ifstream f(FsPath(*absolutePath), std::ios::in | std::ios::binary);
         if (f.good()) {
             STDString body;
             f.seekg(0, std::ios::end);
@@ -134,7 +134,7 @@ bool SaveExternalFile(std::string_view path, PathRootType root, StringView conte
 
     if (!CreateParentDirectoryRecursive(*absolutePath)) return false;
 
-    std::ofstream f(absolutePath->c_str(), std::ios::out | std::ios::binary | (append ? std::ios::app : 0));
+    std::ofstream f(FsPath(*absolutePath), std::ios::out | std::ios::binary | (append ? std::ios::app : 0));
     if (!f.good()) {
         OsiError("Could not open file for writing: '" << path << "'");
         return false;

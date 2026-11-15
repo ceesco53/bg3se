@@ -215,9 +215,9 @@ struct PropertyMapFallbackEntry
     // FIXME - no typing as cast is not constexpr
     //GenericPropertyMap::TFallbackGetter* Getter{ nullptr };
     //GenericPropertyMap::TFallbackSetter* Setter{ nullptr };
-    void* Getter{ nullptr };
-    void* Setter{ nullptr };
-    void* Next{ nullptr };
+    ErasedFunctionPtr Getter{ nullptr };
+    ErasedFunctionPtr Setter{ nullptr };
+    ErasedFunctionPtr Next{ nullptr };
 };
 
 struct PropertyMapPropertyEntry
@@ -503,9 +503,16 @@ inline constexpr RawPropertyAccessors::Serializer* PickPropertySerializer()
     
 #define GENERATING_PROPMAP
 
+// Fallback accessors are stored type-erased, which is not a constant expression in standard C++
+#if defined(_MSC_VER)
+#define SE_PROPMAP_STORAGE static constexpr
+#else
+#define SE_PROPMAP_STORAGE static inline const
+#endif
+
 #define BEGIN_CLS_TN(cls, typeName, id) template <> struct PropertyMapRegistrations<cls> { \
     using ObjectType = cls; \
-    static constexpr PropertyMapRegistrationEntry Definitions[] = { \
+    SE_PROPMAP_STORAGE PropertyMapRegistrationEntry Definitions[] = { \
         { .Type = PropertyMapEntryType::Class, .Cls = { \
             .Name = #cls, \
             .TypeName = #typeName, \

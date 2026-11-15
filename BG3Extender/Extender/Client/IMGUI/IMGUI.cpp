@@ -11,8 +11,12 @@
 
 #define IMGUI_FRAME_DEBUG(msg, ...) if ((frameNo_ % 100) == 0) { IMGUI_DEBUG(msg, __VA_ARGS__); }
 
+#if defined(__APPLE__)
+#include <macOS/Platform/IMGUIBackend.inl>
+#else
 #include <Extender/Client/IMGUI/Vulkan.inl>
 #include <Extender/Client/IMGUI/DX11.inl>
+#endif
 #include <Lua/Shared/LuaMethodCallHelpers.h>
 
 BEGIN_NS(extui)
@@ -1866,11 +1870,15 @@ void IMGUIObjectManager::Clear()
 IMGUIManager::IMGUIManager(SDLManager& sdl)
     : sdl_(sdl)
 {
+#if defined(__APPLE__)
+    renderer_ = std::make_unique<NullBackend>(*this);
+#else
     if (GetModuleHandleW(L"bg3_dx11.exe") == NULL) {
         renderer_ = std::make_unique<VulkanBackend>(*this);
     } else {
         renderer_ = std::make_unique<DX11Backend>(*this);
     }
+#endif
 
     textureLoader_.BindRenderer(renderer_.get());
 }

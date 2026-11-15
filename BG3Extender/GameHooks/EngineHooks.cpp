@@ -5,7 +5,7 @@
 namespace bg3se
 {
 
-#define HOOK_DEFN(name, sym, defn) decltype(EngineHooks::name) * decltype(EngineHooks::name)::gHook;
+#define HOOK_DEFN(name, sym, defn) SE_DEFINE_HOOK_STORAGE(decltype(EngineHooks::name))
 #include <GameHooks/EngineHooks.inl>
 #undef HOOK_DEFN
 

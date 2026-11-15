@@ -100,6 +100,19 @@ inline constexpr uint64_t Hash(int64_t v)
     return (uint64_t)v;
 }
 
+#if defined(__APPLE__)
+// On LP64 platforms (unsigned) long is a distinct 64-bit type (size_t, uintptr_t, ...)
+inline constexpr uint64_t Hash(unsigned long v)
+{
+    return v;
+}
+
+inline constexpr uint64_t Hash(long v)
+{
+    return (uint64_t)v;
+}
+#endif
+
 inline constexpr uint64_t Hash(float v)
 {
     if (v >= 9.223372e18f) {

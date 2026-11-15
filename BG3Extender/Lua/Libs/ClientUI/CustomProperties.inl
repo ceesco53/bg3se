@@ -33,6 +33,14 @@ public:
     static void operator delete(void* ptr, void* place) noexcept
     {}
 
+#if !defined(_MSC_VER)
+    // A virtual destructor needs a usual deallocation function to be visible
+    static void operator delete(void* ptr) noexcept
+    {
+        BaseObject::operator delete(ptr);
+    }
+#endif
+
     static const TypeClass* StaticGetClassType(TypeTag<NsCustomDataContext>*)
     {
         static const TypeClass* type{ nullptr };

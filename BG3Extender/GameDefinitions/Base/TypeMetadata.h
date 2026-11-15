@@ -16,7 +16,7 @@ concept IsArray = requires(T a)
     typename T::value_type;
     { a[0] } -> std::same_as<typename T::value_type>;
 }
-|| std::derived_from<T, ::Noesis::BaseCollection>;
+|| (requires { sizeof(T); } && std::derived_from<T, ::Noesis::BaseCollection>);
 
 template <class T>
 concept IsMap = requires(T a)

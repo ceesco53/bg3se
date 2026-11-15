@@ -19,6 +19,35 @@ namespace bg3se {
 
     void const* ResolveRealFunctionAddress(void const* ptr);
 
+#if !defined(_MSC_VER)
+    // Standard C++ has no implicit conversion between function pointers and object pointers
+    // (MSVC allows it as an extension), so the conversions the hooking code relies on are spelled out.
+    template <class R, class... Args>
+    inline void const* ResolveRealFunctionAddress(R (*ptr)(Args...))
+    {
+        return ResolveRealFunctionAddress(reinterpret_cast<void const*>(ptr));
+    }
+
+    // Type-erased function pointer storage, convertible to and from any function pointer type
+    struct ErasedFunctionPtr
+    {
+        void* Ptr{ nullptr };
+
+        inline ErasedFunctionPtr() = default;
+        inline ErasedFunctionPtr(std::nullptr_t) {}
+
+        template <class F> requires std::is_function_v<F>
+        inline ErasedFunctionPtr(F* fun) : Ptr(reinterpret_cast<void*>(fun)) {}
+
+        template <class F> requires std::is_function_v<F>
+        inline explicit operator F* () const { return reinterpret_cast<F*>(Ptr); }
+
+        inline explicit operator bool() const { return Ptr != nullptr; }
+    };
+#else
+    using ErasedFunctionPtr = void*;
+#endif
+
     extern std::unordered_set<void const *> gRegisteredTrampolines;
 
     template <typename T>
@@ -47,6 +76,14 @@ namespace bg3se {
             Wrap(ExportProc, NewFunction);
         }
 
+#if !defined(_MSC_VER)
+        template <class F> requires std::is_function_v<F>
+        void Wrap(F* Function, FuncType NewFunction)
+        {
+            Wrap(reinterpret_cast<void*>(Function), NewFunction);
+        }
+#endif
+
         void Wrap(void * Function, FuncType NewFunction)
         {
             if (IsWrapped()) {
@@ -57,7 +94,7 @@ namespace bg3se {
             OriginalFunc = Function;
             TrampolineFunc = Function;
             NewFunc = NewFunction;
-            gRegisteredTrampolines.insert(NewFunction);
+            gRegisteredTrampolines.insert((void const*)NewFunction);
             auto status = DetourAttachEx((PVOID *)&TrampolineFunc, (PVOID)NewFunc, (PDETOUR_TRAMPOLINE *)&FuncTrampoline, NULL, NULL);
             if (status != NO_ERROR) {
                 ERR("[%s] Detour attach failed on %p", typeid(*this).name(), Function);
@@ -110,6 +147,7 @@ namespace bg3se {
         using FunctionType = R (*)(TObject*, Params...);
         using BaseFunctionType = R (*)(Params...);
         
+#if defined(_MSC_VER)
         static_assert(sizeof(MethodType) == sizeof(FunctionType));
 
         inline static FunctionType ToFunction(MethodType fun)
@@ -121,6 +159,33 @@ namespace bg3se {
         {
             return *reinterpret_cast<MethodType*>(&fun);
         }
+#else
+        // Itanium C++ ABI: a pointer to member function is { ptr, adj }. For non-virtual
+        // functions `ptr` is the function address and `this` is passed as the first argument,
+        // so the conversion is valid as long as no virtual methods / this-adjustments are involved.
+        struct ItaniumMethodPtr
+        {
+            FunctionType Ptr;
+            std::ptrdiff_t Adj;
+        };
+        static_assert(sizeof(MethodType) == sizeof(ItaniumMethodPtr));
+
+        inline static FunctionType ToFunction(MethodType fun)
+        {
+            ItaniumMethodPtr repr;
+            memcpy(&repr, &fun, sizeof(repr));
+            se_assert(repr.Adj == 0);
+            return repr.Ptr;
+        }
+
+        inline static MethodType ToMethod(FunctionType fun)
+        {
+            ItaniumMethodPtr repr{ fun, 0 };
+            MethodType method;
+            memcpy(&method, &repr, sizeof(repr));
+            return method;
+        }
+#endif
     };
 
     template <class Tag, class T>
@@ -170,6 +235,14 @@ namespace bg3se {
             this->wrapped_.Wrap(Module, ProcName, &CallToTrampoline);
             gHook = this;
         }
+
+#if !defined(_MSC_VER)
+        template <class F> requires std::is_function_v<F>
+        void Wrap(F* Function)
+        {
+            Wrap(reinterpret_cast<void*>(Function));
+        }
+#endif
 
         void Wrap(void * Function)
         {
@@ -322,8 +395,8 @@ namespace bg3se {
     private:
         WrappedFunction<R(Params...)> wrapped_;
         HookFuncType* hook_{ nullptr };
-        void* func_{ nullptr };
-        void* func2_{ nullptr };
+        ErasedFunctionPtr func_{ nullptr };
+        ErasedFunctionPtr func2_{ nullptr };
         void* context_{ nullptr };
 
         static R CallToTrampoline(Params... Args)
@@ -375,4 +448,14 @@ namespace bg3se {
 
         static WrappableFunction<Tag, R(Params...)> * gHook;
     };
+
+    // Every WrappableFunction instantiation needs storage for its static gHook pointer.
+    // MSVC accepts a plain per-hook definition; standard C++ wants it defined once as a template.
+#if defined(_MSC_VER)
+#define SE_DEFINE_HOOK_STORAGE(...) __VA_ARGS__ * __VA_ARGS__::gHook;
+#else
+#define SE_DEFINE_HOOK_STORAGE(...)
+    template <class Tag, class R, class... Params>
+    WrappableFunction<Tag, R(Params...)>* WrappableFunction<Tag, R(Params...)>::gHook{ nullptr };
+#endif
 }

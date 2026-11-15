@@ -7,7 +7,7 @@
 
 BEGIN_SE()
 
-decltype(Hooks::eocnet__ClientConnectMessage__Serialize)* decltype(Hooks::eocnet__ClientConnectMessage__Serialize)::gHook;
+SE_DEFINE_HOOK_STORAGE(decltype(Hooks::eocnet__ClientConnectMessage__Serialize))
 
 void Hooks::Startup()
 {

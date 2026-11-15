@@ -3,10 +3,14 @@
 #include <GameDefinitions/Base/Base.h>
 #include <CoreLib/Utils.h>
 
+#if defined(_MSC_VER)
 namespace std
 {
     class thread;
 }
+#else
+#include <thread>
+#endif
 
 BEGIN_SE()
 

@@ -41,14 +41,14 @@ public:
     T* Allocate()
     {
         for (auto i = 0; i < std::size(l1_); i++) {
-            unsigned long l1;
+            DWORD l1;
             if (_BitScanForward64(&l1, l1_[i])) {
                 auto l2off = (i << PageShift) + l1;
-                unsigned long l2;
+                DWORD l2;
                 _BitScanForward64(&l2, l2_[l2off]);
                 se_assert(l2 < PageBits);
                 auto l3off = (i << (2 * PageShift)) + (l1 << PageShift) + l2;
-                unsigned long l3;
+                DWORD l3;
                 _BitScanForward64(&l3, l3_[l3off]);
                 se_assert(l3 < PageBits);
                 l3_[l3off] &= ~(1ull << l3);

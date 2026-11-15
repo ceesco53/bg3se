@@ -120,20 +120,20 @@ struct HashTablePagedAllocator
     {
         // The parent sparse structure controls allocations for the table; we shouldn't get here
         se_assert(false && "Trying to invoke sparse hash table allocator but it shouldn't be used!");
-        terminate();
+        std::terminate();
     }
 
     template <class T>
     inline T* allocArray(std::size_t size)
     {
         se_assert(false && "Trying to invoke sparse hash table allocator but it shouldn't be used!");
-        terminate();
+        std::terminate();
     }
 
     inline void free(void* ptr)
     {
         se_assert(false && "Trying to invoke sparse hash table allocator but it shouldn't be used!");
-        terminate();
+        std::terminate();
     }
 };
 

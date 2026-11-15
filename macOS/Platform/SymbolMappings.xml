@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Engine symbol table for the macOS build of the game.
+
+  The Windows build locates engine functions with byte patterns (BG3Extender/GameHooks/BinaryMappings.xml)
+  because bg3.exe has no symbols. The macOS game binary keeps its full symbol table, so each entry here
+  simply names the Mach-O symbol that a StaticSymbols member (GameDefinitions/Symbols.h) is bound to.
+
+  An entry belongs here only once the symbol has been checked against the game binary: it exists, and for
+  functions the calling convention matches the *Proc type the extender declares (arm64: `this` in x0,
+  non-trivial return values through x8). Symbols that exist under a matching name but with a different
+  signature are listed at the bottom and deliberately left unbound.
+
+  Checked against game version 4.1.1.7631656. Verify with macOS/scripts/check-symbols.py after a game update.
+-->
+<BinaryMappings>
+  <Mappings Version="4.1.1.7631656" Default="true">
+    <!-- Core -->
+    <Symbol Name="ls__ThreadRegistry__RequestThreadIndex" Mangled="_ZN2ls14ThreadRegistry18RequestThreadIndexEv" />
+    <Symbol Name="ls__FileReader__ctor" Mangled="_ZN2ls10FileReaderC1ERKNS_4PathENS0_5ETypeENS_9EnumFlagsINS_10EFileFlagsEEE" Critical="true" />
+    <Symbol Name="ls__FileReader__dtor" Mangled="_ZN2ls10FileReaderD1Ev" Critical="true" />
+    <Symbol Name="ls__FileSystem__CollectFilesWithGlob" Mangled="_ZN2ls10FileSystem20CollectFilesWithGlobERKNS_4PathERKNS_11_StringViewIcEEbRNS_12DynamicArrayIS1_NS_15TaggedAllocatorIiEEEEb" />
+    <Symbol Name="ls__gTranslatedStringRepository" Mangled="_ZN2ls26TranslatedStringRepository5m_ptrE" Critical="true" />
+    <Symbol Name="ls__gTranslatedStringKeyManager" Mangled="_ZN2ls26TranslatedStringKeyManager5m_ptrE" />
+    <Symbol Name="ls__gInputManager" Mangled="_ZN2ls12InputManager5m_ptrE" />
+    <Symbol Name="ls__gGlobalResourceManager" Mangled="_ZN2ls15ResourceManager5m_ptrE" />
+    <Symbol Name="ls__GlobalTemplateManager" Mangled="_ZN2ls21GlobalTemplateManager5m_ptrE" />
+    <Symbol Name="ls__gDragDropManager" Mangled="_ZN2ls15DragDropManager5m_ptrE" />
+
+    <!-- Client / server -->
+    <Symbol Name="ecl__EoCClient" Mangled="_ZN3ecl9EocClient5m_ptrE" Critical="true" />
+    <Symbol Name="esv__EoCServer" Mangled="_ZN3esv9EocServer5m_ptrE" Critical="true" />
+    <Symbol Name="ecl__EoCClient__HandleError" Mangled="_ZN3ecl9EocClient11HandleErrorERKN2ls16TranslatedStringEbS4_N3eoc18EMessageBoxLocalIdE" />
+    <Symbol Name="ecl__gCursorControl" Mangled="_ZN3ecl13CursorControl5m_ptrE" />
+    <Symbol Name="ecl__gGameStateEventManager" Mangled="_ZN3ecl21GameStateEventManager5m_ptrE" Critical="true" />
+    <Symbol Name="esv__gGameStateEventManager" Mangled="_ZN3esv21GameStateEventManager5m_ptrE" Critical="true" />
+    <Symbol Name="ecl__GameStateThreaded__GameStateWorker__DoWork" Mangled="_ZN3ecl17GameStateThreaded15GameStateWorker6DoWorkEv" Critical="true" />
+    <Symbol Name="esv__GameStateMachine__Update" Mangled="_ZN3esv16GameStateMachine6UpdateERKN2ls8GameTimeE" Critical="true" />
+    <Symbol Name="ecs__EntityWorld__Update" Mangled="_ZN3ecs11EntityWorld6UpdateERKN2ls8GameTimeE" Critical="true" />
+    <Symbol Name="ecs__EntityWorld__FlushECBs" Mangled="_ZN3ecs11EntityWorld9FlushECBsEv" />
+    <Symbol Name="esv__LevelManager" Mangled="_ZN3esv12LevelManager5m_ptrE" />
+    <Symbol Name="ecl__LevelManager" Mangled="_ZN3ecl12LevelManager5m_ptrE" />
+    <Symbol Name="esv__CacheTemplateManager" Mangled="_ZN3esv20CacheTemplateManager5m_ptrE" />
+    <Symbol Name="esv__SavegameManager" Mangled="_ZN3esv15SavegameManager5m_ptrE" />
+    <Symbol Name="esv__OsirisVariableHelper__SavegameVisit" Mangled="_ZN3esv20OsirisVariableHelper13SavegameVisitEPN3eoc15SavegameVisitorE" />
+    <Symbol Name="esv__gSurfaceActionFactory" Mangled="_ZN3esv20SurfaceActionFactory5m_ptrE" />
+    <Symbol Name="esv__TransformSurfaceAction__Init" Mangled="_ZN3esv22TransformSurfaceAction4InitEN3eoc27ESurfaceTransformActionTypeENS1_13ESurfaceLayerENS1_12ESurfaceTypeE" />
+    <Symbol Name="eoc__AiGrid__FindPath" Mangled="_ZN3eoc6AiGrid8FindPathEi" />
+
+    <!-- Stats -->
+    <Symbol Name="gRPGStats" Mangled="_ZN8RPGStats5m_ptrE" />
+    <Symbol Name="eoc__SpellPrototypeManager" Mangled="_ZN3eoc21SpellPrototypeManager5m_ptrE" />
+    <Symbol Name="eoc__SpellPrototype__Init" Mangled="_ZN3eoc14SpellPrototype4InitERKN2ls11FixedStringE" />
+    <Symbol Name="eoc__StatusPrototypeManager" Mangled="_ZN3eoc22StatusPrototypeManager5m_ptrE" />
+    <Symbol Name="eoc__StatusPrototype__Init" Mangled="_ZN3eoc15StatusPrototype4InitERKN2ls11FixedStringEb" />
+    <Symbol Name="eoc__BoostPrototypeManager" Mangled="_ZN3eoc21BoostPrototypeManager5m_ptrE" />
+    <Symbol Name="eoc__InterruptPrototypeManager" Mangled="_ZN3eoc25InterruptPrototypeManager5m_ptrE" />
+    <Symbol Name="eoc__DynamicStatsExpressionManager" Mangled="_ZN3eoc29DynamicStatsExpressionManager5m_ptrE" />
+
+    <!--
+      Present under a matching name but NOT bound, because the macOS signature differs from the extender's:
+        eoc__AiGrid__FindPathImmediate                      eoc::AiGrid::FindPathImmediate(int, bool)  (extra bool)
+        ls__AppliedMaterial__TryOverrideTexture2DParameter  (FixedString const&, FixedString const&, bool)  (extra bool)
+        Noesis__*                                           return Noesis::Ptr<> / Point by value (x8 on arm64)
+      Not found by name (inlined or renamed; need locating by analysis):
+        ls__PathRoots (ls::Path::s_Roots has a different shape), App__Ctor, App__UpdatePaths, App__LoadGraphicSettings,
+        AppInstance, esv__GameStateThreaded__GameStateWorker__DoWork, ecl__GameStateMachine__Update, RPGStats__Load,
+        RPGStats__ParseDataBuffers, the esv__ExecuteStatsFunctor_* family, eoc__PassivePrototype*, Noesis reflection data.
+    -->
+  </Mappings>
+</BinaryMappings>

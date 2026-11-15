@@ -20,7 +20,15 @@ namespace bg3se
         socket_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         sockaddr_in addr;
         addr.sin_family = AF_INET;
+#if defined(_WIN32)
+#if defined(_WIN32)
         addr.sin_addr.S_un.S_addr = ip;
+#else
+        addr.sin_addr.s_addr = ip;
+#endif
+#else
+        addr.sin_addr.s_addr = ip;
+#endif
         addr.sin_port = htons(port_);
         if (bind(socket_, (sockaddr *)&addr, sizeof(addr)) != 0) {
             ERR_LOCAL("Could not bind debugger server socket: %d", WSAGetLastError());
@@ -145,7 +153,7 @@ namespace bg3se
     {
         while (socket_ != INVALID_SOCKET) {
             sockaddr_in addr;
-            int addrlen = sizeof(addr);
+            socklen_t addrlen = sizeof(addr);
             clientSocket_ = accept(socket_, (sockaddr *)&addr, &addrlen);
             if (clientSocket_ != INVALID_SOCKET) {
                 DEBUG_LOCAL("Accepted debug connection.");

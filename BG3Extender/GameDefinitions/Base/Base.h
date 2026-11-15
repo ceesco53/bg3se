@@ -10,8 +10,14 @@
 
 // The game has a jank SEH handler that silently swallows STATUS_CPP_EH_EXCEPTION without passing it
 // to the top-level handler, so we need to have additional checks at the common SE entry points
+#if defined(_WIN32)
 #define BEGIN_GUARDED() __try {
 #define END_GUARDED() } __except (HandleGuardedException(GetExceptionCode(), GetExceptionInformation())) {}
+#else
+// No SEH outside Windows; hardware faults are reported by the platform crash handler instead.
+#define BEGIN_GUARDED() {
+#define END_GUARDED() }
+#endif
 
 BEGIN_SE()
 LONG HandleGuardedException(DWORD code, EXCEPTION_POINTERS* info);

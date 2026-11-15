@@ -184,7 +184,16 @@ void DebugConsole::Print(DebugMessageType type, char const* msg)
 
 void DebugConsole::ConsoleThread()
 {
+#if !defined(_WIN32)
+    // Interactive input needs a terminal; when the game is started by Steam or Finder stdin is
+    // not one, and the console is output-only (see the log file).
+    if (!isatty(STDIN_FILENO)) {
+        return;
+    }
+#endif
+
     while (consoleRunning_) {
+#if defined(_WIN32)
         wchar_t tempBuf;
         DWORD tempRead{ 0 };
         if (!ReadConsoleW(GetStdHandle(STD_INPUT_HANDLE), &tempBuf, 1, &tempRead, NULL)
@@ -192,6 +201,13 @@ void DebugConsole::ConsoleThread()
             || tempBuf != '\r') {
             continue;
         }
+#else
+        std::string enterLine;
+        std::getline(std::cin, enterLine);
+        if (std::cin.fail() || std::cin.eof()) {
+            return;
+        }
+#endif
 
         DEBUG("Entering server Lua console.");
 
@@ -258,12 +274,21 @@ void DebugConsole::InputLoop()
 
 void DebugConsole::UpdateConsoleSize()
 {
+#if defined(_WIN32)
     CONSOLE_SCREEN_BUFFER_INFOEX buf;
     buf.cbSize = sizeof(buf);
     GetConsoleScreenBufferInfoEx(GetStdHandle(STD_OUTPUT_HANDLE), &buf);
 
     auto width = buf.srWindow.Right - buf.srWindow.Left + 1;
     auto height = buf.srWindow.Bottom - buf.srWindow.Top + 1;
+#else
+    int width = 120, height = 40;
+    struct winsize size;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &size) == 0 && size.ws_col > 0) {
+        width = size.ws_col;
+        height = size.ws_row;
+    }
+#endif
 
     if (width_ != width || height_ != height) {
         width_ = width;
@@ -280,7 +305,9 @@ void DebugConsole::Create()
     consoleRunning_ = true;
     serverContext_ = !gExtender->GetConfig().DefaultToClientConsole;
 
+#if defined(_WIN32)
     SetConsoleTitleW(L"BG3 Script Extender Debug Console");
+#endif
     DEBUG("******************************************************************************");
     DEBUG("*                                                                            *");
     DEBUG("*                     BG3 Script Extender Debug Console                      *");

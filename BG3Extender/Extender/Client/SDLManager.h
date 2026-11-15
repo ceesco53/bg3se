@@ -12,7 +12,7 @@ using SDLStartTextInputProc = void();
 
 #define SDL_HOOK(name) enum class SDL##name##HookTag {}; \
     using SDL##name##HookType = WrappableFunction<SDL##name##HookTag, decltype(SDL_##name)>; \
-    SDL##name##HookType* SDL##name##HookType::gHook;
+    SE_DEFINE_HOOK_STORAGE(SDL##name##HookType)
 
 SDL_HOOK(CreateWindow)
 SDL_HOOK(PollEvent)

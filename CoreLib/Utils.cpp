@@ -1,6 +1,9 @@
 #include "stdafx.h"
 #include <CoreLib/Base/Base.h>
 #include <Shlwapi.h>
+#if defined(__APPLE__)
+#include <macOS/Platform/Darwin.h>
+#endif
 
 BEGIN_SE()
 
@@ -40,6 +43,15 @@ std::wstring FromStdUTF8(std::string_view s)
     return converted;
 }
 
+#if defined(__APPLE__)
+std::optional<std::string> GetExeResource(int resourceId)
+{
+    // Resources are linked into the dylib as named sections instead of PE resources
+    char name[32];
+    snprintf(name, sizeof(name), "res%d", resourceId);
+    return darwin::GetEmbeddedResource(name);
+}
+#else
 std::optional<std::string> GetExeResource(int resourceId)
 {
     auto hResource = FindResource(gCoreLibPlatformInterface.ThisModule, MAKEINTRESOURCE(resourceId), L"SCRIPT_EXTENDER");
@@ -60,6 +72,7 @@ std::optional<std::string> GetExeResource(int resourceId)
 
     return {};
 }
+#endif
 
 void Debug(DebugMessageType type, _In_z_ _Printf_format_string_ char const* fmt, ...)
 {
@@ -114,7 +127,7 @@ bool TryCreateDirectory(std::wstring const& path)
 
 bool SaveFile(std::wstring const& path, std::vector<uint8_t> const& body)
 {
-    std::ofstream f(path, std::ios::binary | std::ios::out);
+    std::ofstream f(FsPath(path), std::ios::binary | std::ios::out);
     if (!f.good()) {
         return false;
     }
@@ -125,7 +138,7 @@ bool SaveFile(std::wstring const& path, std::vector<uint8_t> const& body)
 
 bool SaveFile(std::wstring const& path, std::string_view body)
 {
-    std::ofstream f(path, std::ios::binary | std::ios::out);
+    std::ofstream f(FsPath(path), std::ios::binary | std::ios::out);
     if (!f.good()) {
         return false;
     }
@@ -136,7 +149,7 @@ bool SaveFile(std::wstring const& path, std::string_view body)
 
 bool LoadFile(std::wstring const& path, std::vector<uint8_t>& body)
 {
-    std::ifstream f(path, std::ios::in | std::ios::binary);
+    std::ifstream f(FsPath(path), std::ios::in | std::ios::binary);
     if (f.good()) {
         f.seekg(0, std::ios::end);
         auto size = f.tellg();
@@ -152,7 +165,7 @@ bool LoadFile(std::wstring const& path, std::vector<uint8_t>& body)
 
 bool LoadFile(std::wstring const& path, std::string& body)
 {
-    std::ifstream f(path, std::ios::in | std::ios::binary);
+    std::ifstream f(FsPath(path), std::ios::in | std::ios::binary);
     if (f.good()) {
         f.seekg(0, std::ios::end);
         auto size = f.tellg();
@@ -168,6 +181,10 @@ bool LoadFile(std::wstring const& path, std::string& body)
 
 void const* ResolveRealFunctionAddress(void const * ptr)
 {
+#if !defined(_M_X64) && !defined(__x86_64__)
+    // x86 incremental-link thunk / import-jump resolution; function addresses are direct elsewhere
+    return ptr;
+#else
     auto p = (uint8_t const*)ptr;
 
     // Unconditional jump
@@ -192,6 +209,7 @@ void const* ResolveRealFunctionAddress(void const * ptr)
 
     // Could not find any relocations
     return ptr;
+#endif
 }
 
 END_SE()

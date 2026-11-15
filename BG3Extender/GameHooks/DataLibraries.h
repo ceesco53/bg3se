@@ -10,11 +10,22 @@ namespace bg3se {
     {
         uint16_t Major{ 0 }, Minor{ 0 }, Revision{ 0 }, Build{ 0 };
 
+#if defined(__APPLE__)
+        // The macOS game is versioned by its bundle (CFBundleVersion, e.g. 4.1.1.7631656), not by
+        // the Windows file version. The build number doesn't fit Build, so it is kept separately.
+        uint32_t BundleBuild{ 0 };
+
+        inline bool IsSupported() const
+        {
+            return Major == 4 && Minor >= 1;
+        }
+#else
         inline bool IsSupported() const
         {
             // We need v4.69 or later for game
             return (Major == 4 && ((Minor == 69 && Revision >= 95) || (Minor > 69)));
         }
+#endif
     };
 
     class LibraryManager
@@ -22,6 +33,12 @@ namespace bg3se {
     public:
         LibraryManager();
         bool FindLibraries(uint32_t gameRevision);
+#if defined(__APPLE__)
+        // Resolves engine symbols by name from the game's Mach-O symbol table
+        bool FindLibrariesDarwin();
+        // Symbols were resolved but deliberately left unbound (see FindLibrariesDarwin)
+        bool DiagnosticMode{ false };
+#endif
         bool PostStartupFindLibraries();
         void ApplyCodePatches();
         bool GetGameVersion(GameVersionInfo & version);

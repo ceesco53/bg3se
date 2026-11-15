@@ -3,6 +3,9 @@
 [Downloads available here](https://github.com/Norbyte/bg3se/releases)
 
 The Script Extender adds Lua/Osiris scripting support to the game.
+
+> **macOS port (work in progress):** this fork adds a native build for the macOS version of the game.
+> It is not usable for mods yet. See [macOS/README.md](macOS/README.md) for its status, installation and build steps.
 [API Documentation](https://github.com/Norbyte/bg3se/blob/master/Docs/API.md)
 
 ### Configuration
@@ -29,6 +32,8 @@ The following configuration variables can be set in the `ScriptExtenderSettings.
 | LuaDebuggerPort | Integer | 9998 | Port number the Lua debugger will listen on  |
 
 ### Build Instructions
+
+For macOS, see [macOS/README.md](macOS/README.md). For Windows:
 
 Run `first-time-setup.bat` from the MSVC x64 Native Tools cmdline after cloning the repo ensure that all external dependencies are set up correctly.
 Afterwards you can build/develop the solution using normal Visual Studio tools.

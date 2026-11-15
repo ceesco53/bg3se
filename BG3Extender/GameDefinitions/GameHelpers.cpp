@@ -143,7 +143,11 @@ namespace bg3se
         auto gtm = GetStaticSymbols().GetGlobalTemplateManager();
         if (!gtm) return nullptr;
 
-#if defined(OSI_EOCAPP)
+#if defined(__APPLE__)
+        // FIXME(macOS): the bank is selected by a thread-local slot index whose location in the
+        // macOS build hasn't been mapped yet.
+        return nullptr;
+#elif defined(OSI_EOCAPP)
         auto tls = *(uint64_t*)__readgsqword(0x58);
         auto slot = ((uint8_t*)tls)[8];
         return gtm->Banks[slot];

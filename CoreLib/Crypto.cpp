@@ -82,7 +82,7 @@ bool CryptoUtils::GenerateKeys(std::wstring const& privateKeyPath)
         return false;
     }
 
-    std::ofstream of(privateKeyPath.c_str(), std::ios::out | std::ios::binary);
+    std::ofstream of(FsPath(privateKeyPath), std::ios::out | std::ios::binary);
     if (!of.good()) {
         return false;
     }

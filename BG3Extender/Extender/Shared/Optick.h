@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(SE_IS_DEVELOPER_BUILD)
+#if defined(SE_IS_DEVELOPER_BUILD) && defined(_WIN32)
 #define USE_OPTICK 1
 #define OPTICK_ENABLE_GPU 0
 #else

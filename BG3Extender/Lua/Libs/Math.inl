@@ -19,14 +19,14 @@ struct TryOpOrFail
         return false;
     }
 
-    template <class T1>
-    static __forceinline auto Do(lua_State* L, T1 const& a) -> decltype((void)(T::Do(L, a)), void())
+    template <class T1, class TOp = T>
+    static __forceinline auto Do(lua_State* L, T1 const& a) -> decltype((void)(TOp::Do(L, a)), void())
     {
         T::Do(L, a);
     }
 
-    template <class T1, class T2>
-    static __forceinline auto Do(lua_State* L, T1 const& a, T2 const& b) -> decltype((void)(T::Do(L, a, b)), void())
+    template <class T1, class T2, class TOp = T>
+    static __forceinline auto Do(lua_State* L, T1 const& a, T2 const& b) -> decltype((void)(TOp::Do(L, a, b)), void())
     {
         T::Do(L, a, b);
     }
@@ -36,14 +36,14 @@ struct TryOpOrFail
         return false;
     }
 
-    template <class T1>
-    static __forceinline auto DoInPlace(lua_State* L, T1 const& a) -> decltype((void)(T::DoInPlace(L, a)), void())
+    template <class T1, class TOp = T>
+    static __forceinline auto DoInPlace(lua_State* L, T1 const& a) -> decltype((void)(TOp::DoInPlace(L, a)), void())
     {
         T::DoInPlace(L, a);
     }
 
-    template <class T1, class T2>
-    static __forceinline auto DoInPlace(lua_State* L, T1 const& a, T2 const& b) -> decltype((void)(T::DoInPlace(L, a, b)), void())
+    template <class T1, class T2, class TOp = T>
+    static __forceinline auto DoInPlace(lua_State* L, T1 const& a, T2 const& b) -> decltype((void)(TOp::DoInPlace(L, a, b)), void())
     {
         T::DoInPlace(L, a, b);
     }

@@ -10,7 +10,7 @@
 
 #include <Extender/Shared/SavegameSerializer.inl>
 
-#define STATIC_HOOK(name) decltype(bg3se::esv::ScriptExtender::name) * decltype(bg3se::esv::ScriptExtender::name)::gHook;
+#define STATIC_HOOK(name) SE_DEFINE_HOOK_STORAGE(decltype(bg3se::esv::ScriptExtender::name))
 STATIC_HOOK(gameStateWorkerStart_)
 STATIC_HOOK(gameStateMachineUpdate_)
 

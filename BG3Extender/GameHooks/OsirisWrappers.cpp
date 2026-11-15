@@ -12,7 +12,7 @@
 namespace bg3se
 {
 
-#define STATIC_HOOK(name) decltype(OsirisWrappers::name) * decltype(OsirisWrappers::name)::gHook;
+#define STATIC_HOOK(name) SE_DEFINE_HOOK_STORAGE(decltype(OsirisWrappers::name))
 
 STATIC_HOOK(RegisterDivFunctions)
 STATIC_HOOK(InitGame)
@@ -51,6 +51,15 @@ void OsirisWrappers::RegisterDIVFunctionsPreHook(void * Osiris, DivFunctions * F
 
 void OsirisWrappers::Initialize()
 {
+#if defined(__APPLE__)
+    // FIXME(macOS): libOsiris.dylib exports everything hooked below (COsiris::RegisterDIVFunctions,
+    // InitGame, Load, Event, ... and the manager globals), but its internal databases use libc++
+    // containers whose layouts differ from the Windows definitions in GameDefinitions/Osiris.h.
+    // Until those are verified, Osiris is left unhooked rather than read through wrong layouts.
+    WARN("Osiris integration is not available on macOS yet; Osi.* calls and Osiris event listeners are disabled.");
+    return;
+#endif
+
     Kernel32Module = LoadLibrary(L"kernel32.dll");
     if (Kernel32Module == NULL) {
         Fail("Could not load kernel32.dll");
@@ -361,7 +370,7 @@ bool OsirisWrappers::ResolveNodeVMTsInternal()
     std::vector<NodeVMT *> srvA, srvB;
     for (auto vmt : VMTs) {
         if (srv == nullptr) {
-            srv = vmt->SetLineNumber;
+            srv = (void*)vmt->SetLineNumber;
         }
 
         if (srv == vmt->SetLineNumber) {
@@ -448,11 +457,11 @@ bool OsirisWrappers::ResolveNodeVMTsInternal()
     std::map<void *, std::vector<NodeVMT *>> snnMaps;
     std::vector<NodeVMT *> * queryVMTs{ nullptr };
     for (auto vmt : VMTs) {
-        if (snnMaps.find(vmt->SetNextNode) == snnMaps.end()) {
+        if (snnMaps.find((void*)vmt->SetNextNode) == snnMaps.end()) {
             std::vector<NodeVMT *> nvmts{ vmt };
-            snnMaps.insert(std::make_pair(vmt->SetNextNode, nvmts));
+            snnMaps.insert(std::make_pair((void*)vmt->SetNextNode, nvmts));
         } else {
-            snnMaps[vmt->SetNextNode].push_back(vmt);
+            snnMaps[(void*)vmt->SetNextNode].push_back(vmt);
         }
     }
 

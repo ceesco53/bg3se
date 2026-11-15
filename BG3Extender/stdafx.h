@@ -20,6 +20,11 @@
 #include <shared_mutex>
 #include <variant>
 #include <span>
+#include <algorithm>
+
+#if defined(__APPLE__)
+#include <macOS/Platform/Darwin.h>
+#endif
 
 #include <Extender/BuildInfo.h>
 #include <Extender/Shared/Utils.h>

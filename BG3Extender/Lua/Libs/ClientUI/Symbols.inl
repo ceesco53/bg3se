@@ -8,9 +8,14 @@ struct SymbolInfo
     static Symbol Name;
 };
 
+#if defined(_MSC_VER)
 #define FOR_NOESIS_TYPE(T) Symbol SymbolInfo<T>::Name;
 FOR_EACH_NOESIS_TYPE()
 #undef FOR_NOESIS_TYPE
+#else
+template <class T>
+Symbol SymbolInfo<T>::Name;
+#endif
 
 Symbol MakeNoesisSymbol(char const* name);
 

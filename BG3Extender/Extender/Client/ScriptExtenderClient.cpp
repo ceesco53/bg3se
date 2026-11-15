@@ -8,7 +8,7 @@
 #include <Extender/Version.h>
 #include <shlwapi.h>
 
-#define STATIC_HOOK(name) decltype(bg3se::ecl::ScriptExtender::name) * decltype(bg3se::ecl::ScriptExtender::name)::gHook;
+#define STATIC_HOOK(name) SE_DEFINE_HOOK_STORAGE(decltype(bg3se::ecl::ScriptExtender::name))
 STATIC_HOOK(gameStateWorkerStart_)
 STATIC_HOOK(gameStateMachineUpdate_)
 

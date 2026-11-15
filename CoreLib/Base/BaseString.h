@@ -353,9 +353,18 @@ namespace bg3se
             uint64_t _Pad6[7];
             uint64_t field_1180;
             uint64_t _Pad7[7];
+#if defined(__APPLE__)
+            // The macOS build keeps the 0x1200 size but has a different lock in the tail
+            uint8_t Lock[0x40];
+#else
             CRITICAL_SECTION CriticalSection;
             uint64_t field_11E8[3];
+#endif
         };
+
+        static_assert(sizeof(SubTable) == 0x1200);
+        static_assert(offsetof(SubTable, EntrySize) == 0x1088);
+        static_assert(offsetof(SubTable, Buckets) == 0x1140);
 
         struct MainTable
         {
@@ -542,6 +551,15 @@ namespace std
     inline ostream& operator << (ostream& out, bg3se::Guid const& guid)
     {
         out << guid.ToString();
+        return out;
+    }
+
+    inline ostream& operator << (ostream& out, bg3se::FixedStringUnhashed const& str)
+    {
+        if (str) {
+            out << str.GetString();
+        }
+
         return out;
     }
 

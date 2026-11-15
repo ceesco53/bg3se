@@ -5,6 +5,9 @@
 #include <psapi.h>
 #include <DbgHelp.h>
 #include <CoreLib/tinyxml2.h>
+#if defined(__APPLE__)
+#include <macOS/Platform/Darwin.h>
+#endif
 
 #undef DEBUG_MAPPINGS
 
@@ -1057,6 +1060,30 @@ uint8_t const * AsmResolveInstructionRef(uint8_t const * insn)
     return nullptr;
 }
 
+#if defined(__APPLE__)
+bool SymbolMapper::AddModule(std::string const& name, std::wstring const& modName)
+{
+    // Module names are Mach-O image names here; an empty name is the main executable
+    auto imageName = ToStdUTF8(modName);
+    if (imageName.size() > 4 && imageName.compare(imageName.size() - 4, 4, ".exe") == 0) {
+        // The shared code names the game module after the Windows executable
+        imageName.clear();
+    }
+    darwin::ImageInfo image;
+    if (!darwin::GetImageInfo(imageName.empty() ? nullptr : imageName.c_str(), image)) {
+        ERR("SymbolMapper::AddModule(): Couldn't find loaded image '%s'", imageName.c_str());
+        return false;
+    }
+
+    ModuleInfo modInfo;
+    modInfo.ModuleStart = image.Start;
+    modInfo.ModuleSize = image.Size;
+    modInfo.ModuleTextStart = image.TextStart;
+    modInfo.ModuleTextSize = image.TextSize;
+    modules_.insert(std::make_pair(name, modInfo));
+    return true;
+}
+#else
 bool SymbolMapper::AddModule(std::string const& name, std::wstring const& modName)
 {
     auto hLib = LoadLibraryW(modName.c_str());
@@ -1093,6 +1120,7 @@ bool SymbolMapper::AddModule(std::string const& name, std::wstring const& modNam
     modules_.insert(std::make_pair(name, modInfo));
     return true;
 }
+#endif
 
 void SymbolMapper::AddEngineCallback(std::string const& name, std::function<MappingResult(uint8_t const*)> const& cb)
 {

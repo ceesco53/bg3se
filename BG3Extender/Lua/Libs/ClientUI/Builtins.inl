@@ -166,12 +166,12 @@ void* Cast(const TypeClass* type, BaseObject* obj)
     return nullptr;
 }
 
-void* BaseObject::operator new(unsigned __int64 sz)
+void* BaseObject::operator new(SizeT sz)
 {
     return GameAllocRaw(sz);
 }
 
-void* BaseObject::operator new(unsigned __int64 sz, void* ptr)
+void* BaseObject::operator new(SizeT sz, void* ptr)
 {
     return ptr;
 }

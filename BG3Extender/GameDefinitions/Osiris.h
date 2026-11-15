@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <array>
+#include <list>
 #include <vector>
 #include <set>
 #include <map>

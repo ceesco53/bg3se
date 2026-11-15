@@ -202,7 +202,7 @@ void GenerateIdeHelpers(lua_State* L, std::optional<bool> builtinOnly)
         path += GetStaticSymbols().GetModManagerServer()->BaseModule.Info.Directory;
         path += "/Story/RawFiles/Lua/OsiIdeHelpers.lua";
 
-        std::ofstream f(path.c_str(), std::ios::out | std::ios::binary);
+        std::ofstream f(FsPath(path), std::ios::out | std::ios::binary);
         if (!f.good()) {
             OsiError("Could not open file to save IDE helpers: '" << path << "'");
             return;

@@ -35,9 +35,9 @@ namespace bg3se
 void InitCrashReporting();
 void ShutdownCrashReporting();
 
-decltype(ScriptExtender::CoreLibInit)* decltype(ScriptExtender::CoreLibInit)::gHook;
-decltype(ScriptExtender::AppUpdatePaths)* decltype(ScriptExtender::AppUpdatePaths)::gHook;
-decltype(ScriptExtender::AppLoadGraphicSettings)* decltype(ScriptExtender::AppLoadGraphicSettings)::gHook;
+SE_DEFINE_HOOK_STORAGE(decltype(ScriptExtender::CoreLibInit))
+SE_DEFINE_HOOK_STORAGE(decltype(ScriptExtender::AppUpdatePaths))
+SE_DEFINE_HOOK_STORAGE(decltype(ScriptExtender::AppLoadGraphicSettings))
 
 std::unique_ptr<ScriptExtender> gExtender;
 
@@ -108,6 +108,9 @@ void ScriptExtender::Initialize()
     InitStaticSymbols();
 
     if (!Libraries.FindLibraries(gameVersion_.Revision)) {
+#if defined(__APPLE__)
+        if (!Libraries.DiagnosticMode)
+#endif
         ERR("ScriptExtender::Initialize: Could not load libraries; skipping scripting extension initialization.");
     }
 

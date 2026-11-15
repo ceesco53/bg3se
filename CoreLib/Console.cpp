@@ -1,6 +1,9 @@
 #include "stdafx.h"
 #include <CoreLib/Console.h>
 #include <iostream>
+#if !defined(_WIN32)
+#include <unistd.h>
+#endif
 
 BEGIN_SE()
 
@@ -36,8 +39,23 @@ void Console::SetColor(DebugMessageType type)
         break;
     }
 
+#if defined(_WIN32)
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     SetConsoleTextAttribute(hConsole, wAttributes);
+#else
+    // ANSI SGR colors, only when writing to a terminal
+    if (isatty(STDOUT_FILENO)) {
+        char const* color = "\x1b[0m";
+        switch (type) {
+        case DebugMessageType::Error: color = "\x1b[1;31m"; break;
+        case DebugMessageType::Warning: color = "\x1b[33m"; break;
+        case DebugMessageType::Osiris: color = "\x1b[1;36m"; break;
+        case DebugMessageType::Info: color = "\x1b[1;37m"; break;
+        case DebugMessageType::Debug: default: break;
+        }
+        std::cout << color;
+    }
+#endif
 }
 
 void Console::LocalPrint(DebugMessageType type, char const* msg)
@@ -87,6 +105,11 @@ void Console::Create()
 {
     if (created_) return;
 
+#if !defined(_WIN32)
+    // The process already has its standard streams; there is no separate console window to open.
+    created_ = true;
+    return;
+#else
     AllocConsole();
 
     if (IsValidCodePage(CP_UTF8)) {
@@ -120,6 +143,7 @@ void Console::Create()
     FILE* inputStream;
     freopen_s(&inputStream, "CONIN$", "r", stdin);
     created_ = true;
+#endif
 }
 
 void Console::Destroy()

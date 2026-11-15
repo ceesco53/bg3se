@@ -37,9 +37,143 @@ namespace bg3se
         : symbolMapper_(mappings_)
     {}
 
+#if defined(__APPLE__)
+}
+#include <Extender/Shared/tinyxml2.h>
+namespace bg3se {
+    namespace {
+        using GstGetProc = LSStringView (uint32_t id);
+        GstGetProc* gGstGet{ nullptr };
+
+        // The macOS build has no out-of-line FixedString::GetString; ls::gst::Get does the lookup
+        LSStringView* DarwinFixedStringGetString(FixedStringBase const* self, LSStringView& sv)
+        {
+            sv = gGstGet(self->Index);
+            return &sv;
+        }
+    }
+
+    bool LibraryManager::FindLibrariesDarwin()
+    {
+        auto xml = GetExeResource(IDR_BINARY_MAPPINGS);
+        tinyxml2::XMLDocument doc;
+        if (!xml || doc.Parse(xml->c_str(), xml->size()) != tinyxml2::XML_SUCCESS) {
+            ERR("Failed to load symbol mapping table");
+            CriticalInitFailed = true;
+            return false;
+        }
+
+        if (!BindApp()) {
+            ERR("LibraryManager::FindLibraries(): Unable to bind BG3 module.");
+            CriticalInitFailed = true;
+            return false;
+        }
+
+        // Engine integration on macOS is experimental: struct layouts and hook signatures are still
+        // being verified against the macOS binary. Unless it is switched on explicitly, symbols are
+        // resolved and reported but nothing is bound, so no hook is installed and no game memory is
+        // touched (the extender behaves as it does on an unsupported game version).
+        GameVersionInfo version;
+        if (GetGameVersion(version)) {
+            INFO("macOS game build %d.%d.%d.%u", version.Major, version.Minor, version.Revision, version.BundleBuild);
+        }
+
+        auto engineEnv = getenv("BG3SE_ENGINE");
+        bool bindSymbols = engineEnv != nullptr && strcmp(engineEnv, "1") == 0;
+
+        // <Symbol Name="(StaticSymbols member)" Mangled="(Mach-O symbol)" [Image="..."] [Critical="true"] />
+        unsigned mapped{ 0 }, missing{ 0 };
+        auto root = doc.FirstChildElement("BinaryMappings");
+        auto mappings = root ? root->FirstChildElement("Mappings") : nullptr;
+        for (auto sym = mappings ? mappings->FirstChildElement("Symbol") : nullptr; sym != nullptr; sym = sym->NextSiblingElement("Symbol")) {
+            auto name = sym->Attribute("Name");
+            auto mangled = sym->Attribute("Mangled");
+            auto image = sym->Attribute("Image");
+            bool critical = sym->BoolAttribute("Critical", false);
+            if (!name || !mangled) {
+                ERR("Symbol mapping must have a Name and a Mangled attribute");
+                continue;
+            }
+
+            auto staticSym = mappings_.StaticSymbols.find(name);
+            if (staticSym == mappings_.StaticSymbols.end()) {
+                ERR("Symbol mapping references unknown engine symbol: %s", name);
+                continue;
+            }
+
+            auto address = darwin::FindSymbol(image, mangled);
+            if (address == nullptr) {
+                missing++;
+                if (critical) {
+                    ERR("Critical engine symbol not found: %s (%s)", name, mangled);
+                    CriticalInitFailed = true;
+                } else {
+                    WARN("Engine symbol not found: %s (%s)", name, mangled);
+                    InitFailed = true;
+                }
+                continue;
+            }
+
+            mapped++;
+            if (bindSymbols) {
+                auto target = reinterpret_cast<void**>(reinterpret_cast<uint8_t*>(&GetStaticSymbols()) + staticSym->second.Offset);
+                *target = address;
+                staticSym->second.Bound = true;
+            }
+        }
+
+        INFO("Engine symbols: %d resolved, %d missing", mapped, missing);
+
+        if (!bindSymbols) {
+            auto gstOk = darwin::FindSymbol(nullptr, "_ZN2ls3gst3GetEj") != nullptr
+                && darwin::FindSymbol(nullptr, "_ZN2ls3gst3AddERKNS_11_StringViewIcEE") != nullptr
+                && darwin::FindSymbol(nullptr, "_ZN2ls3gst10s_InstanceE") != nullptr;
+            INFO("Global string table: %s", gstOk ? "resolved" : "NOT FOUND");
+            INFO("Running in diagnostic mode: engine integration is disabled (set BG3SE_ENGINE=1 to enable the experimental engine hooks).");
+            CriticalInitFailed = true;
+            DiagnosticMode = true;
+            return false;
+        }
+
+        // The game allocates with the system allocator (ls::MemoryManager wraps malloc / free),
+        // which BG3Alloc / BG3Free fall back to when no allocator symbols are bound.
+        gCoreLibPlatformInterface.Alloc = &BG3Alloc;
+        gCoreLibPlatformInterface.Free = &BG3Free;
+
+        // Global string table: same layout as on Windows, reached through ls::gst
+        auto& sym = GetStaticSymbols();
+        gGstGet = reinterpret_cast<GstGetProc*>(darwin::FindSymbol(nullptr, "_ZN2ls3gst3GetEj"));
+        auto gstAdd = darwin::FindSymbol(nullptr, "_ZN2ls3gst3AddERKNS_11_StringViewIcEE");
+        auto gstAcquire = darwin::FindSymbol(nullptr, "_ZN2ls3gst7AcquireEj");
+        auto gstRelease = darwin::FindSymbol(nullptr, "_ZN2ls3gst3Map7ReleaseERKNS0_12NodePoolDataE");
+        auto gstInstance = darwin::FindSymbol(nullptr, "_ZN2ls3gst10s_InstanceE");
+        if (!gGstGet || !gstAdd || !gstAcquire || !gstRelease || !gstInstance) {
+            ERR("Global string table functions not found; FixedString support is unavailable");
+            CriticalInitFailed = true;
+        } else {
+            sym.ls__FixedString__GetString = &DarwinFixedStringGetString;
+            sym.ls__FixedString__IncRef = reinterpret_cast<FixedString::IncRefProc*>(gstAcquire);
+            sym.ls__GlobalStringTable__MainTable__DecRef = reinterpret_cast<GlobalStringTable::MainTable::DecRefProc*>(gstRelease);
+            sym.ls__gGlobalStringTable = reinterpret_cast<GlobalStringTable**>(gstInstance);
+
+            gCoreLibPlatformInterface.ls__FixedString__CreateFromString = reinterpret_cast<FixedString::CreateFromStringProc*>(gstAdd);
+            gCoreLibPlatformInterface.ls__FixedString__GetString = sym.ls__FixedString__GetString;
+            gCoreLibPlatformInterface.ls__FixedString__IncRef = sym.ls__FixedString__IncRef;
+            gCoreLibPlatformInterface.ls__GlobalStringTable__MainTable__DecRef = sym.ls__GlobalStringTable__MainTable__DecRef;
+            gCoreLibPlatformInterface.ls__gGlobalStringTable = sym.ls__gGlobalStringTable;
+        }
+
+        return !CriticalInitFailed;
+    }
+#endif
+
     bool LibraryManager::FindLibraries(uint32_t gameRevision)
     {
         RegisterSymbols();
+
+#if defined(__APPLE__)
+        return FindLibrariesDarwin();
+#endif
 
         SymbolMappingLoader loader(mappings_);
         PreRegisterLibraries(loader);
@@ -208,6 +342,19 @@ namespace bg3se
         return true;
     }
 
+#if defined(__APPLE__)
+    bool LibraryManager::GetGameVersion(GameVersionInfo & version)
+    {
+        uint32_t major, minor, revision, build;
+        if (!darwin::GetGameBundleVersion(major, minor, revision, build)) return false;
+        version.Major = (uint16_t)major;
+        version.Minor = (uint16_t)minor;
+        version.Revision = (uint16_t)revision;
+        version.Build = (uint16_t)(build & 0xffff);
+        version.BundleBuild = build;
+        return true;
+    }
+#else
     bool LibraryManager::GetGameVersion(GameVersionInfo & version)
     {
         HMODULE hGameModule = GetModuleHandleW(L"bg3.exe");
@@ -243,6 +390,7 @@ namespace bg3se
         FreeResource(hData);
         return true;
     }
+#endif
 
     void LibraryManager::ShowStartupError(STDString const & msg, bool wait, bool exitGame)
     {

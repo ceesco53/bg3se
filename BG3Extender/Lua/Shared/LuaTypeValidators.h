@@ -271,7 +271,7 @@ inline bool Validate(bg3se::stats::ConditionId const* s, Overload<bg3se::stats::
 }
 
 template <class T> requires std::is_enum_v<T>
-typename bool Validate(T const* v, Overload<T>)
+bool Validate(T const* v, Overload<T>)
 {
 #if defined(ENABLE_FLAKY_HEURISTICS)
     if constexpr (IsBitfield<T>) {
@@ -692,7 +692,7 @@ template <class T>
 bool ValidateAny(T const* v);
 
 template <class T>
-typename bool Validate(OverrideableProperty<T> const* v, Overload<OverrideableProperty<T>>)
+bool Validate(OverrideableProperty<T> const* v, Overload<OverrideableProperty<T>>)
 {
     CHECKR(Validate(&v->IsOverridden, Overload<bool>{}));
     CHECKR(ValidateAny(&v->Value));
@@ -700,7 +700,7 @@ typename bool Validate(OverrideableProperty<T> const* v, Overload<OverrideablePr
 }
 
 template <class T>
-typename bool ValidateRef(OverrideableProperty<T> const* v, Overload<OverrideableProperty<T>>)
+bool ValidateRef(OverrideableProperty<T> const* v, Overload<OverrideableProperty<T>>)
 {
     CHECKR(Validate(&v->IsOverridden, Overload<bool>{}));
     CHECKR(ValidateAny(&v->Value));
