@@ -45,15 +45,18 @@ opt-in through `BG3SE_ENGINE` (below).
 2. In Steam, open the game's Properties and set **Launch Options** to:
 
    ```
-   "/full/path/to/bg3se-launch.sh" %command%
+   /full/path/to/bg3se-launch.sh %command%
    ```
+
+   The launcher has to be the first word: Steam on macOS runs it as a program, so the
+   `VAR=value %command%` form used on other platforms fails with "OS Error 260".
 
 3. Start the game from Steam, then read `~/Library/Application Support/BG3ScriptExtender/bg3se.log`.
 
-To get the Lua console, enable the engine integration and the console in the launch options:
+To get the Lua console, pass the engine stage and the console switch to the launcher:
 
 ```
-BG3SE_ENGINE=2 BG3SE_CONSOLE=1 "/full/path/to/bg3se-launch.sh" %command%
+/full/path/to/bg3se-launch.sh --engine 2 --console %command%
 ```
 
 and, once the game is running, connect from a terminal:
@@ -64,9 +67,12 @@ and, once the game is running, connect from a terminal:
 
 Type Lua code, or `server` / `client` to choose which Lua state runs it, `reset` to reload, `help`
 for the rest. The console is served on a Unix socket in
-`~/Library/Application Support/BG3ScriptExtender/` that only your user can open. If the game was
-started from a terminal instead (`BG3SE_ENGINE=2 BG3SE_CONSOLE=1 ./bg3se-launch.sh`, with Steam
-running), the console is also available directly in that terminal.
+`~/Library/Application Support/BG3ScriptExtender/` that only your user can open. The game can also
+be started from a terminal (`./bg3se-launch.sh --engine 2 --console`, with Steam running); the
+console is then available directly in that terminal as well.
+
+If the game does not start from Steam, `~/Library/Application Support/BG3ScriptExtender/launcher.log`
+records what the launcher was given and why it stopped.
 
 If the game crashes with the extender loaded, close Larian's crash reporter with **Quit without
 sending**: the crash is the extender's, not the game's.
@@ -76,14 +82,14 @@ To remove it, clear the launch options. Nothing inside the game's app bundle is 
 Settings go in `~/Library/Application Support/BG3ScriptExtender/ScriptExtenderSettings.json`
 and use the same keys as the Windows version.
 
-| Environment variable | Effect |
-|--|--|
-| `BG3SE_CONSOLE=1` | Enable the console: on the terminal the game was started from, and on the console socket |
-| `BG3SE_ENGINE=1` | Bind engine symbols; hook and log game state changes |
-| `BG3SE_ENGINE=2` | Also run extender startup (type tables, Lua libraries) and create Lua states |
-| `BG3SE_ENGINE=3` | Also install every engine hook (file reader, ECS update, stats, …) |
+| Launcher option | Environment variable | Effect |
+|--|--|--|
+| `--console` | `BG3SE_CONSOLE=1` | Enable the console: on the terminal the game was started from, and on the console socket |
+| `--engine 1` | `BG3SE_ENGINE=1` | Bind engine symbols; hook and log game state changes |
+| `--engine 2` | `BG3SE_ENGINE=2` | Also run extender startup (type tables, Lua libraries) and create Lua states |
+| `--engine 3` | `BG3SE_ENGINE=3` | Also install every engine hook (file reader, ECS update, stats, …) |
 
-The `BG3SE_ENGINE` stages are experimental and exist so that unverified parts can be switched on
+The engine stages are experimental and exist so that unverified parts can be switched on
 one layer at a time. Stages 1 and 2 have been run in game; stage 3 has not.
 
 ## Build
@@ -99,7 +105,7 @@ cmake --build build/macos -j
 The result is `build/macos/libBG3ScriptExtender.dylib`. To run the game with it:
 
 ```sh
-BG3SE_DYLIB=build/macos/libBG3ScriptExtender.dylib macOS/scripts/bg3se-launch.sh
+macOS/scripts/bg3se-launch.sh        # picks up build/macos/libBG3ScriptExtender.dylib
 ```
 
 Tests that need no game:

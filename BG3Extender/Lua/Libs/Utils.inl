@@ -86,7 +86,12 @@ std::optional<STDString> GameVersion()
     GameVersionInfo gameVersion;
     if (gExtender->GetLibraryManager().GetGameVersion(gameVersion)) {
         std::stringstream ss;
+#if defined(__APPLE__)
+        // The macOS build number doesn't fit the 16-bit Build field
+        ss << "v" << gameVersion.Major << "." << gameVersion.Minor << "." << gameVersion.Revision << "." << gameVersion.BundleBuild;
+#else
         ss << "v" << gameVersion.Major << "." << gameVersion.Minor << "." << gameVersion.Revision << "." << gameVersion.Build;
+#endif
         return ss.str().c_str();
     } else {
         return {};

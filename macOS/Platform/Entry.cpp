@@ -28,7 +28,7 @@ bool IsGameProcess()
     return strstr(path, "Baldur's Gate 3.app/Contents/MacOS/Baldur's Gate 3") != nullptr;
 }
 
-void SetupScriptExtender()
+void SetupScriptExtender(bool testing = false)
 {
     Dl_info self;
     if (dladdr(reinterpret_cast<void const*>(&SetupScriptExtender), &self)) {
@@ -56,8 +56,13 @@ void SetupScriptExtender()
 
     // A game started from Steam or Finder has no visible stdout, so the console is always
     // mirrored to a log file (the previous run's log is kept alongside it).
-    auto logPath = dataDir + "/bg3se.log";
-    rename(logPath.c_str(), (dataDir + "/bg3se.previous.log").c_str());
+    // (tests get their own file so that they never rotate the log of a running game)
+    auto logPath = dataDir + (testing ? "/bg3se-test.log" : "/bg3se.log");
+    if (testing) {
+        unlink(logPath.c_str());
+    } else {
+        rename(logPath.c_str(), (dataDir + "/bg3se.previous.log").c_str());
+    }
     gCoreLibPlatformInterface.GlobalConsole->OpenLogFile(FromStdUTF8(logPath));
     INFO("BG3 Script Extender v%d for macOS (%s), built on " __DATE__ " " __TIME__, CurrentVersion,
 #if defined(__aarch64__)
@@ -107,5 +112,5 @@ void ExtenderLoaded()
 // Runs the startup path in a process that loaded the dylib with dlopen() (see macOS/Tests)
 extern "C" __attribute__((visibility("default"))) void BG3SEInitializeForTesting()
 {
-    SetupScriptExtender();
+    SetupScriptExtender(true);
 }
