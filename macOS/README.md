@@ -9,6 +9,8 @@ menu and in a loaded save), but only when the experimental engine integration is
 large parts of the API that touch game data are not verified. Mods that depend on the extender
 should not be expected to work yet. See [What works](#what-works) before installing.
 
+**What is left to port is tracked in [PORTING.md](PORTING.md).**
+
 ## What works
 
 Checked in game against version 4.1.1.7631656 (Apple Silicon, Steam).
@@ -34,6 +36,8 @@ Checked in game against version 4.1.1.7631656 (Apple Silicon, Steam).
 | Version banner, virtual texture merging | Disabled: they write to game structures whose layout is unverified |
 | Crash reporter, auto-updater | Not ported |
 | Intel Macs | Not supported: the hook engine is arm64-only |
+
+The open items behind each row, and how to pick one up, are in [PORTING.md](PORTING.md).
 
 By default the extender runs in **diagnostic mode**: it resolves engine symbols, writes what it
 found to the log, and installs no hooks, so it cannot affect the game. Everything beyond that is
