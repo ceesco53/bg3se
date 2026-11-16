@@ -349,6 +349,7 @@ public:
     }
 
     void Bind();
+    void EnsureValidated();
     void UnmapMissingComponents();
 #if defined(__APPLE__)
     void AuditComponentLayouts(bool isServer);

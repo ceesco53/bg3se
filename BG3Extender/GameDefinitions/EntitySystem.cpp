@@ -1334,7 +1334,22 @@ void EntitySystemHelpersBase::MapComponentIndices(char const* componentName, Ext
 
 void EntitySystemHelpersBase::MapResourceManagerIndex(char const* componentName, ExtResourceManagerType type)
 {
+#if defined(__APPLE__)
+    // Template arguments are spelled the MSVC way in the class names ("struct X", "enum Y", "> >");
+    // the names recovered from macOS symbols use the Itanium demangler's spelling.
+    STDString normalized(componentName);
+    for (auto keyword : { "struct ", "class ", "enum " }) {
+        for (auto pos = normalized.find(keyword); pos != STDString::npos; pos = normalized.find(keyword, pos)) {
+            normalized.erase(pos, strlen(keyword));
+        }
+    }
+    for (auto pos = normalized.find("> >"); pos != STDString::npos; pos = normalized.find("> >", pos)) {
+        normalized.erase(pos + 1, 1);
+    }
+    auto it = staticDataMappings_.find(normalized);
+#else
     auto it = staticDataMappings_.find(componentName);
+#endif
     if (it != staticDataMappings_.end()) {
         staticDataIndices_[(unsigned)type] = it->second;
     } else {
@@ -1428,6 +1443,7 @@ bool EntitySystemHelpersBase::WasComponentChanged(EntityHandle entityHandle, Ext
 
 void* EntitySystemHelpersBase::GetRawSingleton(ExtComponentType type)
 {
+    EnsureValidated();
     auto& meta = GetComponentMeta(type);
     if (meta.SingleComponentQuery == ecs::UndefinedQuery) {
         WARN("No query defined for singleton %s?", GetComponentName(*meta.ComponentIndex)->c_str());
@@ -1455,6 +1471,7 @@ void* EntitySystemHelpersBase::GetRawSingleton(ExtComponentType type)
 
 EntityHandle EntitySystemHelpersBase::GetSingletonEntity(ExtComponentType type)
 {
+    EnsureValidated();
     auto& meta = GetComponentMeta(type);
     if (meta.SingleComponentQuery == ecs::UndefinedQuery) {
         WARN("No query defined for singleton %s?", GetComponentName(*meta.ComponentIndex)->c_str());
@@ -1525,6 +1542,18 @@ void EntitySystemHelpersBase::Bind()
 
 void EntitySystemHelpersBase::PreUpdate()
 {
+}
+
+// The integrity check and the query cache are normally set up from the first entity world update,
+// which the extender only sees when the engine hooks are installed. Callers that need the cache
+// (singleton and by-component lookups) make sure it exists first.
+void EntitySystemHelpersBase::EnsureValidated()
+{
+    if (!validated_ && GetEntityWorld() != nullptr) {
+        ValidateMappedComponentSizes();
+        UpdateQueryCache();
+        validated_ = true;
+    }
 }
 
 void EntitySystemHelpersBase::PostUpdate()
