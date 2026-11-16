@@ -40,6 +40,8 @@ namespace bg3se
 #if defined(__APPLE__)
 }
 #include <Extender/Shared/tinyxml2.h>
+#include <cxxabi.h>
+#include <deque>
 namespace bg3se {
     namespace {
         using GstGetProc = LSStringView (uint32_t id);
@@ -51,6 +53,85 @@ namespace bg3se {
             sv = gGstGet(self->Index);
             return &sv;
         }
+    }
+
+    // Binds the engine's type indices (components, systems, replicated types, static data).
+    //
+    // Windows finds these by scanning the registration code of every type. The macOS binary has
+    // a named symbol for each one instead: ls::TypeId<T, Context>::m_TypeIndex, where Context says
+    // which index space T is numbered in. The variables are filled in by the game's static
+    // initializers, so only their addresses are recorded here; EntitySystemHelpers reads the
+    // values later, exactly as it does on Windows.
+    void LibraryManager::BindTypeIndicesDarwin()
+    {
+        struct ContextInfo
+        {
+            char const* SymbolName;   // as it appears in the macOS symbol
+            char const* ExtenderName; // as EntitySystemHelpers expects it
+            int32_t Key;              // its address stands in for the Windows context counter
+            unsigned Count;
+        };
+
+        static ContextInfo contexts[] = {
+            { "ecs::ComponentTypeIdContext", "ecs::ComponentTypeIdContext", 0, 0 },
+            { "ecs::OneFrameComponentTypeIdContext", "ecs::OneFrameComponentTypeIdContext", 0, 0 },
+            { "ecs::SystemsContext", "ecs::EntityWorld::SystemsContext", 0, 0 },
+            { "ecs::sync::ReplicatedTypeContext", "ecs::sync::ReplicatedTypeContext", 0, 0 },
+            { "ls::ImmutableDataHeadmaster", "ls::ImmutableDataHeadmaster", 0, 0 },
+        };
+        // Type names have to outlive the maps that point at them
+        static std::deque<std::string> names;
+
+        auto& sym = GetStaticSymbols();
+        for (auto& context : contexts) {
+            context.Count = 0;
+            sym.IndexSymbolToContextMaps.insert(std::make_pair(&context.Key, context.ExtenderName));
+        }
+
+        static constexpr std::string_view Prefix = "ls::TypeId<";
+        static constexpr std::string_view Suffix = ">::m_TypeIndex";
+
+        darwin::ForEachSymbolWithPrefix(nullptr, "_ZN2ls6TypeIdI", [&](char const* mangled, void* address) {
+            std::string_view mangledName(mangled);
+            if (!mangledName.ends_with("11m_TypeIndexE")) return;
+
+            int status = 0;
+            auto demangled = abi::__cxa_demangle(mangled, nullptr, nullptr, &status);
+            if (demangled == nullptr) return;
+            std::string full(demangled);
+            free(demangled);
+
+            if (full.size() <= Prefix.size() + Suffix.size()
+                || full.compare(0, Prefix.size(), Prefix) != 0
+                || full.compare(full.size() - Suffix.size(), Suffix.size(), Suffix) != 0) {
+                return;
+            }
+
+            // "T, Context": split at the last comma that is not inside template brackets
+            auto inner = full.substr(Prefix.size(), full.size() - Prefix.size() - Suffix.size());
+            int depth = 0;
+            size_t split = std::string::npos;
+            for (size_t i = 0; i < inner.size(); i++) {
+                if (inner[i] == '<') depth++;
+                else if (inner[i] == '>') depth--;
+                else if (inner[i] == ',' && depth == 0) split = i;
+            }
+            if (split == std::string::npos || split + 2 >= inner.size()) return;
+
+            auto contextName = inner.substr(split + 2);
+            for (auto& context : contexts) {
+                if (contextName == context.SymbolName) {
+                    names.push_back(inner.substr(0, split));
+                    sym.IndexSymbolToNameMaps.insert(std::make_pair(reinterpret_cast<int32_t*>(address),
+                        IndexSymbolInfo{ names.back().c_str(), &context.Key }));
+                    context.Count++;
+                    break;
+                }
+            }
+        });
+
+        INFO("Engine type indices by name: %d components, %d one-frame components, %d systems, %d replicated types, %d static data types",
+            contexts[0].Count, contexts[1].Count, contexts[2].Count, contexts[3].Count, contexts[4].Count);
     }
 
     bool LibraryManager::FindLibrariesDarwin()
@@ -135,6 +216,7 @@ namespace bg3se {
         }
 
         INFO("Engine integration stage %d (experimental)", darwin::EngineStage());
+        BindTypeIndicesDarwin();
 
         // The game allocates with the system allocator (ls::MemoryManager wraps malloc / free),
         // which BG3Alloc / BG3Free fall back to when no allocator symbols are bound.

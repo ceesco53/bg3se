@@ -12,6 +12,7 @@
 #include <mach-o/getsect.h>
 #include <dlfcn.h>
 #include <cstring>
+#include <functional>
 #include <mutex>
 #include <string_view>
 #include <unordered_map>
@@ -140,6 +141,25 @@ void* FindSymbol(char const* imageName, char const* name)
 
     auto it = image->Symbols.find(std::string_view(name));
     return it != image->Symbols.end() ? it->second : nullptr;
+}
+
+void ForEachSymbolWithPrefix(char const* imageName, char const* prefix, std::function<void(char const*, void*)> const& callback)
+{
+    std::lock_guard lock(ImagesMutex());
+    auto image = FindImage(imageName);
+    if (!image) return;
+
+    if (!image->SymbolsIndexed) {
+        IndexSymbols(*image);
+    }
+
+    std::string_view wanted(prefix);
+    for (auto const& symbol : image->Symbols) {
+        if (symbol.first.size() >= wanted.size() && symbol.first.compare(0, wanted.size(), wanted) == 0) {
+            // Names are views into the image's (null-terminated) string table
+            callback(symbol.first.data(), symbol.second);
+        }
+    }
 }
 
 bool GetImageInfo(char const* imageName, ImageInfo& info)

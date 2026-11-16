@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <string>
 #include <optional>
+#include <functional>
 
 namespace bg3se::darwin {
 
@@ -25,6 +26,10 @@ std::string GetExtenderDataDir();
 // non-exported local symbols that dlsym() cannot see. `image` is a substring of the image path;
 // nullptr means the main executable. Returns nullptr if the symbol is not present.
 void* FindSymbol(char const* image, char const* name);
+
+// Calls `callback(name, address)` for every symbol of the image whose (mangled, no leading
+// underscore) name starts with `prefix`. `name` stays valid for as long as the image is loaded.
+void ForEachSymbolWithPrefix(char const* image, char const* prefix, std::function<void(char const*, void*)> const& callback);
 
 // Address range of a loaded Mach-O image and of its __TEXT,__text section
 struct ImageInfo

@@ -36,6 +36,7 @@ namespace bg3se {
 #if defined(__APPLE__)
         // Resolves engine symbols by name from the game's Mach-O symbol table
         bool FindLibrariesDarwin();
+        void BindTypeIndicesDarwin();
         // Symbols were resolved but deliberately left unbound (see FindLibrariesDarwin)
         bool DiagnosticMode{ false };
 #endif
