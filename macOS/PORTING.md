@@ -4,7 +4,7 @@ This is the working list for the macOS port. It lives on the `macos-port` branch
 in the same commit as the work it describes: when an item is done, tick it and move any facts
 worth keeping into [README.md](README.md).
 
-Last updated 2026-11-15, against game version 4.1.1.7631656 (Steam, Apple Silicon).
+Last updated 2026-11-15 (entity access and fault containment), against game version 4.1.1.7631656 (Steam, Apple Silicon).
 
 - [x] done and checked in the running game
 - [ ] not done
@@ -19,27 +19,44 @@ client and the server side, driven through the console socket, at the main menu 
 save. Osiris functions that the game implements can be called (`Osi.AddGold`, `Osi.GetGold`,
 `Osi.GetHostCharacter` were run in a save).
 
-Everything that reads or changes game data beyond that is still open. The extender's Windows code
+Entities can be read from Lua on both sides (`_C()`, `Ext.Entity.Get`, component fields,
+`GetAllEntitiesWithComponent`), and a fault in extender code is contained as a Lua error instead
+of crashing the game.
+
+Most other game data access is still open. The extender's Windows code
 describes about a thousand game structures by hand; each one a feature touches has to be checked
 against the macOS binary before that feature can be switched on. So far the checked ones are the
 string table, `STDString`, the path roots, the client and server singletons, the game state
-machines, the file reader's first fields, the start of the mod manager, and the Osiris function,
-type and parameter tables.
+machines, the file reader's first fields, the start of the mod manager, the Osiris function,
+type and parameter tables, the entity world with its component and query registries, and the
+engine's critical section.
 
 ## 1. Game data access
 
 These are what most mods use, and none of them work yet.
 
-- [ ] **Entity component indices.** The log lists 2142 components and 170 systems it could not
-  find an index for. Windows finds them by scanning registration code; the macOS binary instead
-  has a named symbol per component type (`ls::TypeId<T, ecs::ComponentTypeIdContext>::m_TypeIndex`,
-  about 10,600 of them), so they can be bound by name. Needed for `Ext.Entity`, `_C()`, and
-  anything that reads a character or item.
-- [ ] **Entity world layout.** `ecs::EntityWorld`, its storage classes and the query and
-  replication structures are unverified. Component indices are useless until these are right.
-- [ ] **Component layouts.** Each component struct in `GameDefinitions/Components/` must match
-  the macOS build. Most are plain data and are likely to match; the ones containing locks or
-  platform types will not (see section 6).
+- [x] **Entity component indices.** Bound by name from the `ls::TypeId<T, Context>::m_TypeIndex`
+  symbols (2107 components, 540 one-frame components, 934 systems, 582 replicated types, 121
+  static data types). The index bound this way is the registry's own index.
+- [x] **Entity world layout.** `ecs::EntityWorld`, the component registry and the query registry
+  match the Windows definitions once cache-line alignment is 128 bytes and critical sections have
+  the engine's macOS layout; pinned with `static_assert`s. Entity storage is exercised by the
+  reads below but not individually pinned.
+- [x] **Reading entities from Lua.** `_C()`, `Ext.Entity.Get(guid)`, component fields,
+  `GetAllComponentNames`, `GetAllEntitiesWithComponent`, on server and client, in a loaded save.
+- [ ] **Component layouts, field by field.** By size, 907 of 909 server components and 722 of
+  722 client components match what the game registered (checked at every start; the list is
+  written to `component-layouts-*.txt` in the data directory and mismatches are disabled).
+  A matching size does not prove every field is where the extender thinks it is; only a handful
+  of components (health, level, stats, display name, resistances) have been read and looked right.
+  - Known size mismatches, all 8 bytes off: `ServerDelayDeath`, `ServerDeathRequest`, and the
+    out-of-line data of `esv::Projectile`, `esv::projectile::InitializationComponent`,
+    `esv::SoundVolumeTrigger`, `esv::TimelineSceneTrigger`, `ecl::TimelineSceneTrigger`,
+    `ls::Construction`, `ls::Scene`.
+- [ ] **Writing components and creating or removing them** (`entity:CreateComponent`,
+  `Replicate`, field assignment) **(untested)**.
+- [ ] **Component events** (`Ext.Entity.Subscribe`, `OnCreate`, …). Need the entity world update
+  hook (stage 3).
 - [ ] **Mod list and mod scripts.** The mod manager is verified only up to the first module's
   name. Loading a mod's `ScriptExtender/Config.json` and bootstrap scripts through the game's
   file reader is **(untested)**. Needed for `Ext.Mod` and for any mod to load at all.
@@ -54,9 +71,9 @@ These are what most mods use, and none of them work yet.
   macOS is unknown (`GameHelpers.cpp`, returns null for now). Needed for `Ext.Template`.
 - [ ] **Levels, AI grid, pathfinding.** Level managers are mapped, unverified.
   `AiGrid::FindPathImmediate` takes an extra argument on macOS and is not bound.
-- [ ] **Localization.** The translated string repository is mapped, but writing to it trips the
-  extender's lock check, so its lock layout is wrong. Needed for `Ext.Loca`; also why the version
-  banner is disabled.
+- [ ] **Localization.** Reading works (`Ext.Loca.GetTranslatedString` returned a character's
+  name). Writing trips the extender's lock check, so the repository's lock layout is wrong; that
+  is also why the version banner is disabled.
 
 ## 2. Osiris
 
@@ -130,11 +147,14 @@ structures checked first.
 
 ## 6. Cross-cutting
 
-- [ ] **Locks inside game structures.** `GameDefinitions/` has 86 lock members declared with
-  Windows types. On macOS the game's `ls::CriticalSection` is its own class (not a pthread mutex)
-  and the replacement for Windows SRW locks is unknown. Every structure containing one has the
-  wrong size or the wrong locking until this is settled. This blocks localization and Noesis and
-  probably more.
+- [x] **Critical sections inside game structures.** `CRITICAL_SECTION` is the engine's
+  `ls::CriticalSection` on macOS (20 bytes; spins, then waits on a Mach semaphore) and is locked
+  through the game's own `Lock` / `Unlock`.
+- [x] **Cache-line alignment.** Engine structures aligned to a cache line use 128 bytes on Apple
+  Silicon (`SE_CACHE_LINE_SIZE`).
+- [ ] **Reader/writer locks inside game structures.** Members declared as Windows SRW locks (and
+  the extender's `SRWSpinLock`) still carry Windows layouts; what the macOS build uses in their
+  place is unknown. This blocks localization writes and Noesis, and probably more.
 - [ ] **Function signatures.** Each engine function still to be bound must be compared with the
   type the extender declares for it: on arm64, functions returning non-trivial objects use a
   hidden result register where the Windows declarations pass an explicit pointer.
@@ -152,13 +172,16 @@ structures checked first.
 
 - [ ] **Intel Macs.** The hook engine is arm64-only; the launcher starts the game without the
   extender on Intel. Needs an x86_64 hook engine and a universal build.
-- [ ] **Crash reporting.** Not ported. Extender crashes currently surface as game crashes, with
-  Larian's reporter offering to send them to Larian. The extender should catch its own faults
-  and keep that reporter out of it.
+- [x] **Fault containment.** A memory fault or failed assertion in extender code, under a Lua
+  protected call or a guarded handler, is caught and reported instead of crashing the game
+  (`Platform/FaultGuard.h`). Verified in game with `Ext.Debug.Crash(2)`.
+- [ ] **What containment does not cover.** Faults in game code that the extender called with bad
+  data, faults on threads with no guard active, and stack overflows still crash the game and
+  bring up Larian's reporter. Contained faults skip destructors, so a lock held at the time stays
+  held. There is no crash report upload.
 - [ ] **Updater.** Not ported (the Windows updater is a separate DLL).
 - [ ] **Lua debugger.** Compiles **(untested)**.
-- [ ] **Log noise.** Every unmapped component and system is logged on each start (about 2,300
-  lines). Collapse to a summary until section 1 is done.
+- [x] **Log noise** from unmapped components and systems: gone now that they are mapped.
 - [ ] **Default stage.** The default is still diagnostic mode; the console needs
   `--engine 2 --console`. Revisit once more of stage 2 is exercised.
 - [ ] **Release.** The signed and notarized archive in `build/release` predates the console and

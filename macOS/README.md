@@ -5,8 +5,8 @@ It builds the extender's own source code as an arm64 dylib that loads into the m
 (the Steam version), instead of the Windows DLL.
 
 **Status: early.** The Lua console works in the macOS game (client and server side, at the main
-menu and in a loaded save), but only when the experimental engine integration is switched on, and
-large parts of the API that touch game data are not verified. Mods that depend on the extender
+menu and in a loaded save), Osiris functions can be called and entities can be read, but only when
+the experimental engine integration is switched on, and much of the API is still unverified. Mods that depend on the extender
 should not be expected to work yet. See [What works](#what-works) before installing.
 
 **What is left to port is tracked in [PORTING.md](PORTING.md).**
@@ -20,11 +20,12 @@ Checked in game against version 4.1.1.7631656 (Apple Silicon, Steam).
 | Build | All of the extender (CoreLib, Lua, Osiris, IMGUI and game definition code) compiles and links with Apple clang for arm64 |
 | Loading | Injected with `DYLD_INSERT_LIBRARIES`; initializes at the game's `main()`. Works |
 | Function hooking | arm64 inline hook engine with instruction relocation; covered by tests and used on live engine functions |
-| Engine symbols | Resolved by name from the game's symbol table; 39 of the extender's 99 engine symbols are mapped |
+| Engine symbols | Resolved by name from the game's symbol table; 39 of the extender's 99 engine symbols are mapped, plus the type index of every component and system |
 | Game state tracking | Works (stage 1): client and server state changes are observed |
 | Lua console | Works (stage 2): client and server Lua states are created, and commands run through the console socket at the main menu and in a loaded save |
 | `Ext.Utils`, `Ext.Json`, `Ext.Math`, `Ext.Enums`, `Ext.Types` | Work as far as tested from the console |
-| Entities and components (`Ext.Entity`) | **Not working**: component and system indices are not mapped on macOS yet (the log lists each one) |
+| Entities and components (`Ext.Entity`, `_C()`) | Reading works (stage 2), server and client: 907 of 909 server and all 722 client component definitions match the sizes the game registers; the rest are disabled. Writing and component events are untested |
+| Fault containment | A fault in extender code under a Lua call or guarded handler becomes an error message instead of a game crash |
 | Stats, templates, resources, levels | Unverified: the symbols are mapped, the structure layouts behind them are not checked |
 | Mod loading (`ScriptExtender/Config.json`, bootstrap scripts) | Unverified |
 | Engine hooks (file reader, ECS update, stats; stage 3) | Untested in game |
@@ -165,11 +166,15 @@ Things established from the macOS game binary so far:
   Windows definitions, apart from one field missing at the start of the client object.
 - Game state listeners are registered by object address (Itanium vtable order).
 - The client state machine's update is inlined; `App::Update` is used as the per-frame client hook.
+- Cache-line aligned engine structures use 128 bytes on Apple Silicon; with that, the entity
+  world, component registry and query registry match the Windows definitions.
+- `ls::CriticalSection` is a 20-byte spin-then-semaphore lock; the extender's `CRITICAL_SECTION`
+  has that layout and calls the game's `Lock` / `Unlock`.
+- Component, system and other type indices are named symbols (`ls::TypeId<T, Context>::m_TypeIndex`).
 - libOsiris is built against libc++: its function, type and parameter tables are `std::map` /
   `std::list` with libc++ layouts (the Windows definitions reproduce MSVC's). The function records
   themselves match. The game's call / query handlers are read from the exported `DIV` table.
-- `ls::CriticalSection` is a custom lock, not a `pthread_mutex_t`; game structures that embed
-  one (or an SRW lock) still carry Windows layouts in `GameDefinitions/` and are unverified.
+- Game structures that embed a Windows SRW lock still carry the Windows layout and are unverified.
 - Functions returning non-trivial objects use `x8` for the result on arm64, where the Windows
   declarations pass an explicit return pointer. Each hooked or called function has to be
   checked for this before it is mapped.
