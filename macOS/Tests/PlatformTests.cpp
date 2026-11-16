@@ -3,6 +3,9 @@
 //
 //   cmake --build build/macos --target SEPlatformTests && build/macos/SEPlatformTests
 #include "../Platform/Darwin.h"
+#include "../Platform/FaultGuard.h"
+
+#include <csignal>
 
 #include <cstdio>
 #include <cstdlib>
@@ -271,10 +274,112 @@ static void TestSymbols()
     CHECK(!IsReadable(reinterpret_cast<void*>(0x10), 8));
 }
 
+// ---------------------------------------------------------------------------------------------
+// Fault containment
+// ---------------------------------------------------------------------------------------------
+
+__attribute__((noinline)) static void WriteThrough(volatile int* pointer)
+{
+    *pointer = 1;
+}
+
+__attribute__((noinline)) static void CopyInto(void* destination)
+{
+    char source[32] = "payload";
+    // The fault happens inside libsystem's memcpy; the nearest frame of ours is this one
+    memcpy(destination, source, sizeof(source));
+}
+
+static void TestFaultGuard()
+{
+    printf("fault guard: null write is contained\n");
+    InstallFaultHandler();
+    InstallFaultHandler(); // idempotent
+    auto before = ContainedFaultCount();
+    {
+        FaultGuard guard;
+        volatile bool reachedEnd = false;
+        if (sigsetjmp(guard.Buf, 0) == 0) {
+            WriteThrough(reinterpret_cast<volatile int*>(0x10));
+            reachedEnd = true;
+        } else {
+            CHECK(guard.Signal == SIGSEGV || guard.Signal == SIGBUS);
+            CHECK(guard.FaultAddress == reinterpret_cast<void*>(0x10));
+            char description[512];
+            DescribeFault(guard, description, sizeof(description));
+            CHECK(strstr(description, "WriteThrough") != nullptr);
+            printf("  %s\n", description);
+        }
+        CHECK(!reachedEnd);
+    }
+    CHECK(ContainedFaultCount() == before + 1);
+
+    printf("fault guard: fault inside a system library called by guarded code\n");
+    {
+        FaultGuard guard;
+        volatile bool contained = false;
+        if (sigsetjmp(guard.Buf, 0) == 0) {
+            CopyInto(reinterpret_cast<void*>(0x20));
+        } else {
+            contained = true;
+        }
+        CHECK(contained);
+    }
+
+    printf("fault guard: nested guards unwind to the innermost\n");
+    {
+        FaultGuard outer;
+        volatile int innerHits = 0, outerHits = 0;
+        if (sigsetjmp(outer.Buf, 0) == 0) {
+            {
+                FaultGuard inner;
+                if (sigsetjmp(inner.Buf, 0) == 0) {
+                    WriteThrough(nullptr);
+                } else {
+                    innerHits = innerHits + 1;
+                }
+            }
+            // The inner guard is gone; this one belongs to the outer guard
+            WriteThrough(nullptr);
+        } else {
+            outerHits = outerHits + 1;
+        }
+        CHECK(innerHits == 1);
+        CHECK(outerHits == 1);
+    }
+
+    printf("fault guard: failed assertion (trap) is contained\n");
+    {
+        FaultGuard guard;
+        volatile bool contained = false;
+        if (sigsetjmp(guard.Buf, 0) == 0) {
+            __builtin_debugtrap();
+        } else {
+            contained = guard.Signal == SIGTRAP;
+        }
+        CHECK(contained);
+    }
+
+    printf("fault guard: the signal is deliverable again afterwards\n");
+    {
+        FaultGuard guard;
+        volatile int hits = 0;
+        for (volatile int i = 0; i < 3; i = i + 1) {
+            if (sigsetjmp(guard.Buf, 0) == 0) {
+                WriteThrough(nullptr);
+            } else {
+                hits = hits + 1;
+            }
+        }
+        CHECK(hits == 3);
+    }
+}
+
 int main()
 {
     TestSymbols();
     TestHooks();
+    TestFaultGuard();
 
     if (gFailures == 0) {
         printf("\nAll platform tests passed.\n");

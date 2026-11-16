@@ -78,6 +78,10 @@ void SetupScriptExtender(bool testing = false)
     }
 
     gExtender->Initialize();
+
+    if (darwin::EngineStage() >= 1) {
+        darwin::InstallFaultHandler();
+    }
 }
 
 using MainProc = int (int argc, char** argv, char** envp, char** apple);

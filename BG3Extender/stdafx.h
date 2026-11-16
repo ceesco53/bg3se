@@ -24,6 +24,7 @@
 
 #if defined(__APPLE__)
 #include <macOS/Platform/Darwin.h>
+#include <macOS/Platform/FaultGuard.h>
 #endif
 
 #include <Extender/BuildInfo.h>

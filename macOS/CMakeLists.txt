@@ -132,6 +132,8 @@ list(FILTER LUA_SOURCES EXCLUDE REGEX "/(lua|luac)\\.c$")
 set_source_files_properties(${LUA_SOURCES} PROPERTIES LANGUAGE CXX)
 add_library(LuaLib STATIC ${LUA_SOURCES})
 target_compile_options(LuaLib PRIVATE -Wno-everything -x c++)
+# Arms the extender's fault guard at Lua's protected-call boundary (see Platform/LuaFaultGuard.h)
+target_compile_options(LuaLib PRIVATE -include "${CMAKE_CURRENT_SOURCE_DIR}/Platform/LuaFaultGuard.h")
 target_compile_definitions(LuaLib PRIVATE NDEBUG LUA_USE_MACOSX)
 target_include_directories(LuaLib PUBLIC "${SE_EXT}/lua/src")
 
@@ -237,6 +239,8 @@ set(SE_PLATFORM_SOURCES
     Platform/Entry.cpp
     Platform/ConsoleSocket.cpp
     Platform/CrashReporter.cpp
+    Platform/FaultGuard.cpp
+    Platform/LuaFaultSupport.cpp
     Platform/Hooking.cpp
     Platform/MachO.cpp
     Platform/NoesisTypeInfo.cpp
@@ -254,7 +258,7 @@ target_precompile_headers(BG3ScriptExtender PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:${SE_ROOT}/BG3Extender/stdafx.h>")
 # Generated protobuf code and the small platform files don't use the extender's prefix header
 set_source_files_properties(${SE_PROTO_SOURCES}
-    Platform/Hooking.cpp Platform/MachO.cpp Platform/NoesisTypeInfo.cpp Platform/Win32Compat.cpp Platform/Darwin.mm
+    Platform/FaultGuard.cpp Platform/Hooking.cpp Platform/MachO.cpp Platform/NoesisTypeInfo.cpp Platform/Win32Compat.cpp Platform/Darwin.mm
     PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 target_link_libraries(BG3ScriptExtender PRIVATE
@@ -281,6 +285,7 @@ set_target_properties(BG3ScriptExtender PROPERTIES
 
 add_executable(SEPlatformTests EXCLUDE_FROM_ALL
     Tests/PlatformTests.cpp
+    Platform/FaultGuard.cpp
     Platform/Hooking.cpp
     Platform/MachO.cpp)
 target_compile_options(SEPlatformTests PRIVATE -fms-extensions -Wno-everything)

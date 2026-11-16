@@ -149,6 +149,8 @@ void CleanupSanityCheck()
 void ScriptExtender::OnGameStateChanged(GameState fromState, GameState toState)
 {
 #if defined(__APPLE__)
+    // The game installs its crash reporter's signal handlers during startup; stay in front of them
+    darwin::InstallFaultHandler();
     INFO("Client game state: %d -> %d", (int)fromState, (int)toState);
     // Stage 1 only observes state changes; everything below acts on game structures
     if (darwin::EngineStage() < 2) return;

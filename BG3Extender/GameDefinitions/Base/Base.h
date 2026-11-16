@@ -13,14 +13,22 @@
 #if defined(_WIN32)
 #define BEGIN_GUARDED() __try {
 #define END_GUARDED() } __except (HandleGuardedException(GetExceptionCode(), GetExceptionInformation())) {}
+#elif defined(__APPLE__)
+// No SEH here. A fault in extender code inside the guarded block is caught by the extender's
+// signal handler and execution continues after the block (see macOS/Platform/FaultGuard.h).
+#include <macOS/Platform/FaultGuard.h>
+#define BEGIN_GUARDED() { ::bg3se::darwin::FaultGuard bg3seFaultGuard; if (sigsetjmp(bg3seFaultGuard.Buf, 0) == 0) {
+#define END_GUARDED() } else { ::bg3se::ReportGuardedFault(bg3seFaultGuard, __func__); } }
 #else
-// No SEH outside Windows; hardware faults are reported by the platform crash handler instead.
 #define BEGIN_GUARDED() {
 #define END_GUARDED() }
 #endif
 
 BEGIN_SE()
 LONG HandleGuardedException(DWORD code, EXCEPTION_POINTERS* info);
+#if defined(__APPLE__)
+void ReportGuardedFault(darwin::FaultGuard const& guard, char const* where);
+#endif
 END_SE()
 
 #include <NsCore/Symbol.h>

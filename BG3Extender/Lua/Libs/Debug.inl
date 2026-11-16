@@ -232,7 +232,7 @@ void LuaDebugBreak(lua_State* L)
 // Development-only function for testing crash reporting
 void Crash(int type)
 {
-#if defined(_DEBUG)
+#if defined(_DEBUG) || defined(__APPLE__) // (on macOS this is how fault containment is exercised)
     switch (type) {
     case 0:
     {
