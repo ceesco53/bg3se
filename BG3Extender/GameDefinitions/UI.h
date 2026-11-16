@@ -604,10 +604,10 @@ struct UIStateMachine : public Noesis::BaseComponent
 };
 
 template <class T>
-struct alignas(64) UnsafeMessageQueue : public ProtectedGameObject<UnsafeMessageQueue<T>>
+struct alignas(SE_CACHE_LINE_SIZE) UnsafeMessageQueue : public ProtectedGameObject<UnsafeMessageQueue<T>>
 {
     T* Head;
-    struct alignas(64)
+    struct alignas(SE_CACHE_LINE_SIZE)
     {
         T* Tail;
         T* BufferEnd;
@@ -1127,7 +1127,7 @@ struct GameUI : public ProtectedGameObject<GameUI>
     GameUIParams GameUIParams;
     NoesisUIManager NoesisUIManager;
     BrushManager BrushManager;
-    alignas(64) uint16_t field_380;
+    alignas(SE_CACHE_LINE_SIZE) uint16_t field_380;
     MPMCQueueBounded<void*> CommandQueue;
     ModManager ModManager;
     __int64 field_3B0;

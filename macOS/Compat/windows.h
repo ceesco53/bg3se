@@ -210,16 +210,25 @@ typedef struct _SYSTEMTIME {
 // embed a lock declare the platform's real layout separately (see GameDefinitions/Base/Lock.h).
 // ---------------------------------------------------------------------------------------------
 
+// On macOS this is the engine's own ls::CriticalSection, so that game structures embedding one
+// have the right layout and are locked the way the game locks them: a recursive lock that spins,
+// then waits on a lazily created Mach semaphore. Layout and protocol verified against
+// ls::CriticalSection::Lock / Unlock in game version 4.1.1.7631656.
 struct CRITICAL_SECTION {
-    pthread_mutex_t mutex;
+    uint32_t Semaphore;      // Mach semaphore port, 0 until the lock is first contended
+    int32_t LockCount;       // -1 when free; incremented by every thread that takes or waits for it
+    int32_t RecursionCount;
+    uint32_t OwnerThread;    // pthread_mach_thread_np() of the owner
+    uint32_t SpinCount;
 };
 typedef CRITICAL_SECTION* LPCRITICAL_SECTION;
 
 void InitializeCriticalSection(CRITICAL_SECTION* cs);
 void DeleteCriticalSection(CRITICAL_SECTION* cs);
-inline void EnterCriticalSection(CRITICAL_SECTION* cs) { pthread_mutex_lock(&cs->mutex); }
-inline void LeaveCriticalSection(CRITICAL_SECTION* cs) { pthread_mutex_unlock(&cs->mutex); }
-inline BOOL TryEnterCriticalSection(CRITICAL_SECTION* cs) { return pthread_mutex_trylock(&cs->mutex) == 0; }
+// Inside the game these call ls::CriticalSection::Lock / Unlock; elsewhere (tests) a compatible fallback
+void EnterCriticalSection(CRITICAL_SECTION* cs);
+void LeaveCriticalSection(CRITICAL_SECTION* cs);
+BOOL TryEnterCriticalSection(CRITICAL_SECTION* cs);
 
 struct SRWLOCK {
     void* Ptr;

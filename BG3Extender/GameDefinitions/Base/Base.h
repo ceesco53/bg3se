@@ -24,6 +24,14 @@
 #define END_GUARDED() }
 #endif
 
+// Alignment the engine uses for structures that must not share a cache line.
+// Apple Silicon has 128-byte cache lines; verified against ecs::EntityWorld in the macOS game.
+#if defined(__APPLE__) && defined(__aarch64__)
+#define SE_CACHE_LINE_SIZE 128
+#else
+#define SE_CACHE_LINE_SIZE 64
+#endif
+
 BEGIN_SE()
 LONG HandleGuardedException(DWORD code, EXCEPTION_POINTERS* info);
 #if defined(__APPLE__)

@@ -246,7 +246,8 @@ void Crash(int type)
         break;
 
     case 2:
-        *(uint32_t*)0 = 0;
+        // (volatile, or the compiler is free to drop a write through a null pointer)
+        *(volatile uint32_t*)0 = 0;
         break;
     }
 #endif

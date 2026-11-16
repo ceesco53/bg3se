@@ -1204,6 +1204,50 @@ void EntitySystemHelpersBase::UpdateComponentMappings()
     initialized_ = true;
 }
 
+#if defined(__APPLE__)
+// The game's component registry records the real size of every component type. A definition in
+// GameDefinitions/Components whose size differs cannot have the right layout for the macOS build,
+// so it is taken out of service instead of being read through a wrong layout. The full list goes
+// to component-layouts-<client|server>.txt in the extender's data directory.
+void EntitySystemHelpersBase::AuditComponentLayouts(bool isServer)
+{
+    unsigned checked = 0, mismatched = 0;
+    std::string report;
+
+    for (uint32_t i = 0; i < (uint32_t)ExtComponentType::Max; i++) {
+        auto& desc = extComponentMap_[i];
+        if (!desc.ComponentIndex) continue;
+
+        auto entry = World->ComponentRegistry_.Get(*desc.ComponentIndex);
+        if (entry == nullptr) continue;
+
+        checked++;
+        if (entry->InlineSize == desc.InlineSize) continue;
+
+        mismatched++;
+        char line[512];
+        snprintf(line, sizeof(line), "%s: extender 0x%x, game 0x%x\n",
+            EnumInfo<ExtComponentType>::Find((ExtComponentType)i).GetString(), (unsigned)desc.InlineSize, (unsigned)entry->InlineSize);
+        report += line;
+
+        ecsComponentData_.GetOrAdd(*desc.ComponentIndex).ExtType = {};
+        BindExtComponent(*desc.ComponentIndex, {});
+        desc.ComponentIndex = {};
+        if (desc.ReplicationIndex) {
+            ecsComponentData_.GetOrAdd(*desc.ReplicationIndex).ExtType = {};
+            desc.ReplicationIndex = {};
+        }
+    }
+
+    auto path = darwin::GetExtenderDataDir() + (isServer ? "/component-layouts-server.txt" : "/component-layouts-client.txt");
+    std::ofstream f(path, std::ios::out | std::ios::trunc);
+    f << "# Components whose size in the extender differs from the game's registry (" << mismatched << " of " << checked << " checked)\n" << report;
+
+    INFO("Component layouts (%s): %d of %d match the game's registered sizes; %d disabled (see %s)",
+        isServer ? "server" : "client", checked - mismatched, checked, mismatched, path.c_str());
+}
+#endif
+
 void EntitySystemHelpersBase::UnmapMissingComponents()
 {
     // Remove components that have a valid ID but are not registered in the current EntityWorld
@@ -1470,6 +1514,12 @@ void EntitySystemHelpersBase::Bind()
 
     if (World != nullptr) {
         UnmapMissingComponents();
+#if defined(__APPLE__)
+        if (!layoutsAudited_) {
+            layoutsAudited_ = true;
+            AuditComponentLayouts(this == &gExtender->GetServer().GetEntityHelpers());
+        }
+#endif
     }
 }
 

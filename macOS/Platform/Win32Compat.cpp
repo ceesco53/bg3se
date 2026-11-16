@@ -38,19 +38,107 @@ thread_local DWORD gLastError{ 0 };
 // Locks
 // ---------------------------------------------------------------------------------------------
 
+namespace {
+
+using CriticalSectionProc = void (CRITICAL_SECTION*);
+
+struct GameCriticalSectionApi
+{
+    CriticalSectionProc* Lock{ nullptr };
+    CriticalSectionProc* Unlock{ nullptr };
+};
+
+GameCriticalSectionApi const& GetGameCriticalSectionApi()
+{
+    static GameCriticalSectionApi api = [] {
+        GameCriticalSectionApi result;
+        result.Lock = reinterpret_cast<CriticalSectionProc*>(bg3se::darwin::FindSymbol(nullptr, "_ZN2ls15CriticalSection4LockEv"));
+        result.Unlock = reinterpret_cast<CriticalSectionProc*>(bg3se::darwin::FindSymbol(nullptr, "_ZN2ls15CriticalSection6UnlockEv"));
+        if (!result.Lock || !result.Unlock) {
+            result.Lock = nullptr;
+            result.Unlock = nullptr;
+        }
+        return result;
+    }();
+    return api;
+}
+
+}
+
 void InitializeCriticalSection(CRITICAL_SECTION* cs)
 {
-    // Win32 critical sections are recursive
-    pthread_mutexattr_t attr;
-    pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-    pthread_mutex_init(&cs->mutex, &attr);
-    pthread_mutexattr_destroy(&attr);
+    // Same initial state as the engine's constructor
+    cs->Semaphore = 0;
+    cs->LockCount = -1;
+    cs->RecursionCount = 0;
+    cs->OwnerThread = 0;
+    cs->SpinCount = 4000;
 }
 
 void DeleteCriticalSection(CRITICAL_SECTION* cs)
 {
-    pthread_mutex_destroy(&cs->mutex);
+    if (cs->Semaphore != 0) {
+        semaphore_destroy(mach_task_self(), cs->Semaphore);
+        cs->Semaphore = 0;
+    }
+}
+
+void EnterCriticalSection(CRITICAL_SECTION* cs)
+{
+    auto const& api = GetGameCriticalSectionApi();
+    if (api.Lock) {
+        api.Lock(cs);
+        return;
+    }
+
+    // Outside the game nothing else touches the lock, so a plain recursive spin lock that keeps
+    // the same field meanings is enough.
+    auto self = GetCurrentThreadId();
+    for (;;) {
+        int32_t expected = -1;
+        if (__atomic_compare_exchange_n(&cs->LockCount, &expected, 0, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+            cs->OwnerThread = self;
+            cs->RecursionCount = 1;
+            return;
+        }
+        if (cs->OwnerThread == self) {
+            __atomic_add_fetch(&cs->LockCount, 1, __ATOMIC_SEQ_CST);
+            cs->RecursionCount++;
+            return;
+        }
+        sched_yield();
+    }
+}
+
+void LeaveCriticalSection(CRITICAL_SECTION* cs)
+{
+    auto const& api = GetGameCriticalSectionApi();
+    if (api.Unlock) {
+        api.Unlock(cs);
+        return;
+    }
+
+    if (--cs->RecursionCount == 0) {
+        cs->OwnerThread = 0;
+    }
+    __atomic_sub_fetch(&cs->LockCount, 1, __ATOMIC_SEQ_CST);
+}
+
+BOOL TryEnterCriticalSection(CRITICAL_SECTION* cs)
+{
+    auto self = GetCurrentThreadId();
+    int32_t expected = -1;
+    if (__atomic_compare_exchange_n(&cs->LockCount, &expected, 0, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) {
+        cs->OwnerThread = self;
+        cs->RecursionCount = 1;
+        return TRUE;
+    }
+    if (cs->OwnerThread == self) {
+        __atomic_add_fetch(&cs->LockCount, 1, __ATOMIC_SEQ_CST);
+        cs->RecursionCount++;
+        return TRUE;
+    }
+    return FALSE;
 }
 
 // SRWLOCK is pointer-sized and zero-initialized, so the real lock lives in a side table keyed by

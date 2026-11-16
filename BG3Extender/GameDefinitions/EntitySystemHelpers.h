@@ -350,6 +350,10 @@ public:
 
     void Bind();
     void UnmapMissingComponents();
+#if defined(__APPLE__)
+    void AuditComponentLayouts(bool isServer);
+    bool layoutsAudited_{ false };
+#endif
     void PreUpdate();
     void PostUpdate();
     void OnFlushECBs();

@@ -102,28 +102,28 @@ inline uint64_t HashMapHash<ecs::ComponentTypeIndex>(ecs::ComponentTypeIndex con
 }
 
 template <class T>
-struct alignas(64) MPMCQueueSlot
+struct alignas(SE_CACHE_LINE_SIZE) MPMCQueueSlot
 {
     std::atomic<uint64_t> NextAndFlags;
     T Value;
 };
 
 template <class T>
-struct alignas(64) MPMCQueueBounded : public ProtectedGameObject<MPMCQueueBounded<T>>
+struct alignas(SE_CACHE_LINE_SIZE) MPMCQueueBounded : public ProtectedGameObject<MPMCQueueBounded<T>>
 {
     uint64_t Capacity;
     MPMCQueueSlot<T>* Slots;
-    struct alignas(64) {
+    struct alignas(SE_CACHE_LINE_SIZE) {
         uint64_t WriteIndex;
     };
-    struct alignas(64) {
+    struct alignas(SE_CACHE_LINE_SIZE) {
         uint64_t ReadIndex;
     };
 };
 
 
 template <class T>
-struct alignas(64) SynchronizedMPMCQueueBounded : public ProtectedGameObject<SynchronizedMPMCQueueBounded<T>>
+struct alignas(SE_CACHE_LINE_SIZE) SynchronizedMPMCQueueBounded : public ProtectedGameObject<SynchronizedMPMCQueueBounded<T>>
 {
     SRWLOCK Lock;
     MPMCQueueBounded<T> Queue;
@@ -138,7 +138,7 @@ inline void* DereferenceProxyComponent(void* component)
     return *static_cast<void**>(component);
 }
 
-struct alignas(64) FrameAllocator : public ProtectedGameObject<FrameAllocator>
+struct alignas(SE_CACHE_LINE_SIZE) FrameAllocator : public ProtectedGameObject<FrameAllocator>
 {
     struct FrameBuffer
     {
@@ -460,7 +460,7 @@ struct EntityReplicationPeer : public ProtectedGameObject<EntityReplicationPeer>
 
 struct EntityHandleGenerator : public ProtectedGameObject<EntityHandleGenerator>
 {
-    struct alignas(64) ThreadState : public ProtectedGameObject<ThreadState>
+    struct alignas(SE_CACHE_LINE_SIZE) ThreadState : public ProtectedGameObject<ThreadState>
     {
         struct Entry
         {
@@ -939,3 +939,23 @@ struct WorldView
 };
 
 END_NS()
+
+#if defined(__APPLE__) && defined(__aarch64__)
+// Verified against the live client ecs::EntityWorld and its component registry in the macOS game
+// (4.1.1.7631656). The Windows layout applies unchanged once cache-line alignment is 128 bytes
+// and critical sections have the engine's macOS layout.
+static_assert(sizeof(bg3se::ecs::ComponentTypeEntry) == 0x40);
+static_assert(offsetof(bg3se::ecs::ComponentTypeEntry, InlineSize) == 0x10);
+static_assert(offsetof(bg3se::ecs::EntityWorld, Systems) == 0x28);
+static_assert(offsetof(bg3se::ecs::EntityWorld, DependencyExecutorQueue) == 0x80);
+static_assert(offsetof(bg3se::ecs::EntityWorld, Time) == 0x200);
+static_assert(offsetof(bg3se::ecs::EntityWorld, CommandBuffers) == 0x230);
+static_assert(offsetof(bg3se::ecs::EntityWorld, Queries) == 0x258);
+static_assert(offsetof(bg3se::ecs::EntityWorld, Storage) == 0x2D0);
+static_assert(offsetof(bg3se::ecs::EntityWorld, ComponentData) == 0x300);
+static_assert(offsetof(bg3se::ecs::FrameAllocator, FrameBuffers) == 0x28);
+static_assert(offsetof(bg3se::ecs::EntityWorld, ComponentOps) == 0x390);
+static_assert(offsetof(bg3se::ecs::EntityWorld, Executor) == 0x3C0);
+static_assert(offsetof(bg3se::ecs::EntityWorld, Cache) == 0x3F0);
+static_assert(sizeof(bg3se::ecs::EntityWorld) == 0x400);
+#endif
